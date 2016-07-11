@@ -303,12 +303,21 @@ namespace BloombergConnection
             string ipAddress = ConfigurationManager.AppSettings["IPAddress"];
             int port = int.Parse(ConfigurationManager.AppSettings["port"]);
 
+
             foreach (string str in daysToOverride)
             {
                 using (Session sess = StartSession(ipAddress, port, refData))
                 {
                     Service refdata = sess.GetService(refData);
                     Request req = refdata.CreateRequest(formattedData.TypeOfRequest);
+
+                    // Securities and fields are handled same way
+                    string[] standards = { "securities", "fields" };
+                    foreach (string stra in standards)
+                    {
+                        AddSecurityOrField(req, stra, formattedData.Data[stra]);
+                        formattedData.Data.Remove(str);
+                    }
 
                     foreach (Overrides over in formattedData.Overrides)
                         SetOverrides(req, over);

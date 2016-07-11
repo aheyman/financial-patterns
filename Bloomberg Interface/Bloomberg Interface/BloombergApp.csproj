@@ -37,9 +37,12 @@
   <PropertyGroup>
     <StartupObject>BloombergConnection.App</StartupObject>
   </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationIcon>modules_financial.ico</ApplicationIcon>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="Bloomberglp.Blpapi">
-      <HintPath>..\..\..\..\..\Downloads\blpapi_dotnet_3.8.10.1\blpapi_dotnet_3.8.10.1\bin\Bloomberglp.Blpapi.dll</HintPath>
+      <HintPath>\\svscbvuser02\users$\ajh3126\Downloads\blpapi_dotnet_3.8.10.1\blpapi_dotnet_3.8.10.1\bin\Bloomberglp.Blpapi.dll</HintPath>
     </Reference>
     <Reference Include="MaterialDesignColors, Version=1.1.2.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\MaterialDesignColors.1.1.2\lib\net45\MaterialDesignColors.dll</HintPath>
@@ -120,6 +123,12 @@
   </ItemGroup>
   <ItemGroup>
     <Resource Include="resource\bloombergBlack.jpg" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="modules_financial.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="resource\modules_financial.ico" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
