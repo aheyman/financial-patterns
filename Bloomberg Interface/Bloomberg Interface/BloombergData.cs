@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Data;
 using System.IO;
 using System.Linq;
@@ -16,30 +17,12 @@ using SessionOptions = Bloomberglp.Blpapi.SessionOptions;
 
 namespace BloombergConnection
 {
-
-    // Helper Classes
-    public class RequestType
-    {
-        private RequestType(string value) { Value = value; }
-
-        public string Value { get; }
-
-        public static RequestType Historical { get { return new RequestType("HistoricalDataRequest"); } }
-        public static RequestType Reference { get { return new RequestType("ReferenceDataRequest"); } }
-
-    }
-
-    enum Periodcity
-    {
-        DAILY,
-        WEEKLY,
-        MONTHLY,
-        QUARTERLY,
-        YEARLY
-    }
-
+    /// <summary>
+    /// Interface for Requests
+    /// </summary>
     public interface Data
     {
+        Periodcity Period { get; set; }
         DateTime StartDate { get; set; }
         DateTime EndDate { get; set; }
         Dictionary<string, List<string>> Data { get; }
@@ -51,6 +34,9 @@ namespace BloombergConnection
 
     }
 
+    /// <summary>
+    /// Class for submitting Bloomberg Historical Requests
+    /// </summary>
     public class HistoricalData : Data
     {
         DateTime _start;
@@ -59,14 +45,18 @@ namespace BloombergConnection
 
         DateTime _end;
         public DateTime EndDate { get { return _end; } set { _end = value; } }
+
         public string TypeOfRequest { get { return RequestType.Historical.Value; } }
+
+        private Periodcity _period;
+        public Periodcity Period { get { return _period; } set { _period = value; } }
 
         Dictionary<string, List<string>> _dict = new Dictionary<string, List<string>>()
         {
             {"securities", new List<string>() },
             {"fields", new List<string>() },
-            {"periodicitySelection", new List<string>() {"DAILY"} },
             {"nonTradingDayFillOption", new List<string>( ){"ACTIVE_DAYS_ONLY"}  },
+            //There are more that should be added
         };
 
         public Dictionary<string, List<string>> Data { get { return _dict; } }
@@ -97,16 +87,21 @@ namespace BloombergConnection
 
     }
 
+    /// <summary>
+    /// Class for Submitting Bloomberg Reference Requests
+    /// </summary>
     public class Reference : Data
     {
         DateTime _start;
         public DateTime StartDate { get { return _start; } set { _start = value; } }
 
-
         DateTime _end;
         public DateTime EndDate { get { return _end; } set { _end = value; } }
 
         public string TypeOfRequest { get { return RequestType.Reference.Value; } }
+
+        private Periodcity _period;
+        public Periodcity Period { get { return _period; } set { _period = value; } }
 
         Dictionary<string, List<string>> _dict = new Dictionary<string, List<string>>()
         {
@@ -118,7 +113,6 @@ namespace BloombergConnection
         List<Overrides> _overrides = new List<Overrides>();
         public List<Overrides> Overrides { get { return _overrides; } }
 
-
         public void AddToDict(string key, string value)
         {
             _dict[key].Add(value);
@@ -129,7 +123,6 @@ namespace BloombergConnection
             _dict[key].AddRange(value);
         }
 
-
         public void AddOverrides(string fieldId, string value)
         {
             _overrides.Add(new Overrides(fieldId, value));
@@ -138,6 +131,31 @@ namespace BloombergConnection
 
     }
 
+    // Helper Classes
+    public class RequestType
+    {
+        private RequestType(string value) { Value = value; }
+
+        public string Value { get; }
+
+        public static RequestType Historical { get { return new RequestType("HistoricalDataRequest"); } }
+        public static RequestType Reference { get { return new RequestType("ReferenceDataRequest"); } }
+
+    }
+
+    public enum Periodcity
+    {
+        DAILY,
+        WEEKLY,
+        MONTHLY,
+        QUARTERLY,
+        YEARLY
+    }
+
+
+    /// <summary>
+    /// Essential a well-organized tuple
+    /// </summary>
     public class Overrides
     {
         private string _fieldId;
@@ -153,7 +171,9 @@ namespace BloombergConnection
     }
 
 
-
+    /// <summary>
+    /// Class for forming, generating and getting output
+    /// </summary>
     public class BloombergData
     {
 
@@ -175,14 +195,26 @@ namespace BloombergConnection
             output = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\request_" + DateTime.Now.ToShortDateString().Replace('/', '-') + ".txt";
         }
 
+        /// <summary>
+        /// Allows for a user to specify output
+        /// </summary>
+        /// <param name="outputLoc"></param>
+        public BloombergData(string outputLoc)
+        {
+            // Initalize the logger
+            string filePath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\Error Log\";
+
+            if (!Directory.Exists(filePath))
+                Directory.CreateDirectory(filePath);
+
+            logFile = filePath + "log_" + DateTime.Now.ToShortDateString().Replace('/', '-') + ".txt";
+            output = outputLoc;
+        }
+
+
 
         public void BloombergRequest(Data formattedData)
         {
-
-            Request request;
-            Session session = StartSession();
-            Service refDataSvc = session.GetService(refData);
-            request = refDataSvc.CreateRequest(formattedData.TypeOfRequest);
 
             DataTable table = new DataTable();
             table.Columns.Add("date");
@@ -191,143 +223,133 @@ namespace BloombergConnection
             foreach (string str in formattedData.Data["fields"])
                 table.Columns.Add(str);
 
-            string[] standards = { "securities", "fields" };
-
-            foreach (string str in standards)
-            {
-                AddSecurityOrField(request, str, formattedData.Data[str]);
-                formattedData.Data.Remove(str);
-            }
-
-
             switch (formattedData.TypeOfRequest)
             {
                 case "HistoricalDataRequest":
-
-                    ProcessHistoricalRequest(request, formattedData);
-                    session.SendRequest(request, new CorrelationID(1));
-                    ConsumeHistSession(session, table);
-
+                    GenerateHistoricalRequest(formattedData, table);
                     break;
 
                 case "ReferenceDataRequest":
-
-
-                    List<string> daysToOverride = GetDateRange(formattedData.StartDate, formattedData.EndDate, Periodcity.QUARTERLY);
-
-
-                    foreach (string str in daysToOverride)
-                    {
-                        try
-                        {
-                            Request req;
-                            Session sess = StartSession();
-                            Service refdata = sess.GetService(refData);
-                            req = refdata.CreateRequest(formattedData.TypeOfRequest);
-                            ProcessReferenceRequest(request, formattedData);
-                            SetOverrides(request, new Overrides("FUNDAMENTAL_PUBLIC_DATE", str));
-                            session.SendRequest(request, new CorrelationID(1));
-                            ConsumeRefSession(session, table, str);
-                        }
-                        catch (Exception e)
-                        {
-
-                        }
-                        finally
-                        {
-                            using (StreamWriter write = new StreamWriter(output))
-                            {
-                                DataTableToCSV(table, write, true);
-                            }
-                        }
-
-
-                    }
+                    GenerateReferenceRequest(formattedData, table);
                     break;
             }
 
-
-
         }
 
-
-        private void ProcessHistoricalRequest(Request request, Data formattedData)
+        /// <summary>
+        /// Forms a Historical Request base on Data object
+        /// </summary>
+        /// <param name="formattedData"></param>
+        /// <param name="table"></param>
+        public void GenerateHistoricalRequest(Data formattedData, DataTable table)
         {
+            AppSettingsSection settings = new AppSettingsSection();
 
-            foreach (KeyValuePair<string, List<string>> entry in formattedData.Data)
+            using (Session sess = StartSession(settings.Settings["IPAddress"].ToString(), int.Parse(settings.Settings["port"].ToString()), refData))
             {
-                if (entry.Value.Count > 0)
-                    HistoricalSession(request, entry.Key, entry.Value.ToArray()[0]);
-            }
+                Service refDataSvc = sess.GetService(refData);
+                Request request = refDataSvc.CreateRequest(formattedData.TypeOfRequest);
 
-            HistoricalSession(request, "startDate", BloombergDateHelper(formattedData.StartDate));
-            HistoricalSession(request, "endDate", BloombergDateHelper(formattedData.EndDate));
-
-        }
-
-
-        private void ProcessReferenceRequest(Request request, Data formattedData)
-        {
-            foreach (Overrides over in formattedData.Overrides)
-                SetOverrides(request, over);
-        }
-
-        private List<string> GetDateRange(DateTime startDate, DateTime endDate, Periodcity period)
-        {
-
-            List<string> result = new List<string>();
-
-            if (endDate < startDate)
-                throw new ArgumentException("endDate must be greater than or equal to startDate");
-
-            while (startDate <= endDate)
-            {
-
-                result.Add(BloombergDateHelper(startDate));
-
-                switch (period)
+                // Securities and fields are handled same way
+                string[] standards = { "securities", "fields" };
+                foreach (string str in standards)
                 {
-                    case Periodcity.DAILY:
-                        startDate = startDate.AddDays(1);
-                        break;
-                    case Periodcity.WEEKLY:
-                        startDate = startDate.AddDays(7);
-                        break;
-                    case Periodcity.MONTHLY:
-                        startDate = startDate.AddMonths(1);
-                        break;
-                    case Periodcity.QUARTERLY:
-                        startDate = startDate.AddMonths(3);
-                        break;
-                    case Periodcity.YEARLY:
-                        startDate = startDate.AddYears(1);
-                        break;
+                    AddSecurityOrField(request, str, formattedData.Data[str]);
+                    formattedData.Data.Remove(str);
                 }
+                
+                //Any other dictionary values
+                foreach (KeyValuePair<string, List<string>> entry in formattedData.Data)
+                {
+                    if (entry.Value.Count > 0)
+                        HistoricalSession(request, entry.Key, entry.Value.ToArray()[0]);
+                }
+                HistoricalSession(request, "startDate", BloombergDateHelper(formattedData.StartDate));
+                HistoricalSession(request, "endDate", BloombergDateHelper(formattedData.EndDate));
+                HistoricalSession(request, "periodicitySelection", PeriodicityHelper(formattedData.Period));
 
+                sess.SendRequest(request, new CorrelationID(1));
 
+                try
+                {
+                    ConsumeHistSession(sess, table);
+                }
+                catch (Exception e)
+                {
+                    Logger(e.Message);
+                }
+                finally
+                {
+                    using (StreamWriter write = new StreamWriter(output))
+                    {
+                        DataTableToCSV(table, write, true);
+                    }
+                }
             }
 
-            return result;
         }
 
-        private string BloombergDateHelper(DateTime date)
+
+        /// <summary>
+        /// Formats a reference request based on a Data object
+        /// </summary>
+        /// <param name="formattedData"></param>
+        /// <param name="table"></param>
+        private void GenerateReferenceRequest(Data formattedData, DataTable table)
         {
-            return date.Year.ToString("D4") + date.Month.ToString("D2") + date.Day.ToString("D2");
+            List<string> daysToOverride = GetDateRange(formattedData.StartDate, formattedData.EndDate, Periodcity.QUARTERLY);
+            AppSettingsSection settings = new AppSettingsSection();
+
+            foreach (string str in daysToOverride)
+            {
+                using (Session sess = StartSession(settings.Settings["IPAddress"].ToString(), int.Parse(settings.Settings["port"].ToString()), refData))
+                {
+                    Service refdata = sess.GetService(refData);
+                    Request req = refdata.CreateRequest(formattedData.TypeOfRequest);
+
+                    foreach (Overrides over in formattedData.Overrides)
+                        SetOverrides(req, over);
+
+                    SetOverrides(req, new Overrides("FUNDAMENTAL_PUBLIC_DATE", str));
+                    sess.SendRequest(req, new CorrelationID(1));
+                    try
+                    {
+                        ConsumeRefSession(sess, table, str);
+                    }
+                    catch (Exception e)
+                    {
+                        Logger(e.Message);
+                    }
+                    finally
+                    {
+                        using (StreamWriter write = new StreamWriter(output))
+                        {
+                            DataTableToCSV(table, write, true);
+                        }
+                    }
+                }
+            }
         }
 
-
-        private Session StartSession()
+        /// <summary>
+        /// Returns a Bloomberg Session to generate any type fo request
+        /// </summary>
+        /// <param name="ipAddress"></param>
+        /// <param name="port"></param>
+        /// <param name="requestType"></param>
+        /// <returns></returns>
+        private Session StartSession(string ipAddress, int port, string requestType)
         {
             SessionOptions sessionOptions = new SessionOptions();
-            sessionOptions.ServerHost = "localhost";
-            sessionOptions.ServerPort = 8194;
+            sessionOptions.ServerHost = ipAddress;
+            sessionOptions.ServerPort = port;
             Session session = new Session(sessionOptions);
             if (!session.Start())
             {
                 Logger("Could not start session.");
                 Environment.Exit(1);
             }
-            if (!session.OpenService(refData))
+            if (!session.OpenService(requestType))
             {
                 Logger("Could not open service refData");
                 Environment.Exit(1);
@@ -336,7 +358,92 @@ namespace BloombergConnection
             return session;
         }
 
+        /// <summary>
+        /// Iterates through the reference session and writes to a table
+        /// Date is required because reference requests do not store dates
+        /// </summary>
+        /// <param name="ses"></param>
+        /// <param name="table"></param>
+        /// <param name="date"></param>
+        private void ConsumeRefSession(Session ses, DataTable table, string date)
+        {
+            bool continueToLoop = true;
 
+            while (continueToLoop)
+            {
+                Event eventObj = ses.NextEvent();
+                switch (eventObj.Type)
+                {
+                    case Event.EventType.RESPONSE: // final response
+                        continueToLoop = false;
+                        HandleRefResponse(eventObj, table, date);
+                        break;
+                    case Event.EventType.PARTIAL_RESPONSE:
+                        HandleRefResponse(eventObj, table, date);
+                        break;
+                    default:
+                        HandleOtherEvent(eventObj);
+                        break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Consumes Historical Reference and writes output to a table
+        /// </summary>
+        /// <param name="ses"></param>
+        /// <param name="table"></param>
+        private void ConsumeHistSession(Session ses, DataTable table)
+        {
+            bool continueToLoop = true;
+
+            while (continueToLoop)
+            {
+                Event eventObj = ses.NextEvent();
+                switch (eventObj.Type)
+                {
+                    case Event.EventType.RESPONSE: // final response
+                        continueToLoop = false;
+                        HandleHistResponse(eventObj, table);
+                        break;
+                    case Event.EventType.PARTIAL_RESPONSE:
+                        HandleHistResponse(eventObj, table);
+                        break;
+                    default:
+                        HandleOtherEvent(eventObj);
+                        break;
+                }
+            }
+        }
+
+
+
+        /// <summary>
+        /// Event handler for !Event.Type.Response/Partial Response
+        /// </summary>
+        /// <param name="eventObj"></param>
+        private void HandleOtherEvent(Event eventObj)
+        {
+            Logger("EventType=" + eventObj.Type);
+            foreach (Message message in eventObj.GetMessages())
+            {
+                Logger("correlationID=" + message.CorrelationID);
+                Logger("messageType=" + message.MessageType);
+                if (Event.EventType.SESSION_STATUS == eventObj.Type &&
+                    message.MessageType.Equals("SessionTerminated"))
+                {
+                    Logger("Terminating: " + message.TopicName);
+                    Environment.Exit(1);
+                }
+            }
+        }
+
+
+        /// <summary>
+        /// Writes bloomberg historical responses to a Datatable
+        /// </summary>
+        /// <param name="eventObj"></param>
+        /// <param name="table"></param>
         private void HandleHistResponse(Event eventObj, DataTable table)
         {
 
@@ -389,12 +496,18 @@ namespace BloombergConnection
 
         }
 
+
+        /// <summary>
+        /// Adds Bloomberg request data to a DataTable for Reference Requests
+        /// </summary>
+        /// <param name="eventObj"></param>
+        /// <param name="table"></param>
+        /// <param name="date"></param>
         private void HandleRefResponse(Event eventObj, DataTable table, string date)
         {
 
             foreach (Message message in eventObj.GetMessages()) // go through each message in the Event
             {
-
                 //responseError
                 Element ReferenceDataResponse = message.AsElement;
                 if (ReferenceDataResponse.HasElement("responseError")) // if there is an error, quit
@@ -437,37 +550,41 @@ namespace BloombergConnection
         }
 
 
+        ///////////////////////////////////////////////////
+        //                                              //
+        //  Helper functions for formatting requests    //
+        //                                              //
+        //////////////////////////////////////////////////
 
 
-
-
-        private void HandleOtherEvent(Event eventObj)
-        {
-            Logger("EventType=" + eventObj.Type);
-            foreach (Message message in eventObj.GetMessages())
-            {
-                Logger("correlationID=" + message.CorrelationID);
-                Logger("messageType=" + message.MessageType);
-                if (Event.EventType.SESSION_STATUS == eventObj.Type &&
-                    message.MessageType.Equals("SessionTerminated"))
-                {
-                    Logger("Terminating: " + message.MessageType);
-                    Environment.Exit(1);
-                }
-            }
-        }
-
+        /// <summary>
+        /// Helper method for adding securities and fields to requests
+        /// </summary>
+        /// <param name="request"></param>
+        /// <param name="key"></param>
+        /// <param name="pairToAdd"></param>
         private void AddSecurityOrField(Request request, string key, List<string> pairToAdd)
         {
             foreach (string t in pairToAdd)
                 request.GetElement(key).AppendValue(t);
         }
 
+        /// <summary>
+        /// Helper method to set parameters for Historical Requests
+        /// </summary>
+        /// <param name="request"></param>
+        /// <param name="key"></param>
+        /// <param name="value"></param>
         private void HistoricalSession(Request request, string key, string value)
         {
             request.Set(key, value);
         }
 
+        /// <summary>
+        /// Overrides are ugly and set ug-ily
+        /// </summary>
+        /// <param name="request"></param>
+        /// <param name="over"></param>
         private void SetOverrides(Request request, Overrides over)
         {
             Element overrides = request.GetElement("overrides");
@@ -477,54 +594,99 @@ namespace BloombergConnection
             override1.SetElement("value", over.Value);
         }
 
-
-        private void ConsumeRefSession(Session ses, DataTable table, string date)
+        /// <summary>
+        /// Returns a list of ALL CALENDAR DAYS (INCLUDING NON TRADING AND HOLIDAYS) between two date times
+        /// </summary>
+        /// <param name="startDate"></param>
+        /// <param name="endDate"></param>
+        /// <param name="period"></param>
+        /// <returns></returns>
+        private List<string> GetDateRange(DateTime startDate, DateTime endDate, Periodcity period)
         {
-            bool continueToLoop = true;
 
-            while (continueToLoop)
+            List<string> result = new List<string>();
+
+            if (endDate < startDate)
+                throw new ArgumentException("endDate must be greater than or equal to startDate");
+
+            while (startDate <= endDate)
             {
-                Event eventObj = ses.NextEvent();
-                switch (eventObj.Type)
+
+                result.Add(BloombergDateHelper(startDate));
+
+                switch (period)
                 {
-                    case Event.EventType.RESPONSE: // final response
-                        continueToLoop = false;
-                        HandleRefResponse(eventObj, table, date);
+                    case Periodcity.DAILY:
+                        startDate = startDate.AddDays(1);
                         break;
-                    case Event.EventType.PARTIAL_RESPONSE:
-                        HandleRefResponse(eventObj, table, date);
+                    case Periodcity.WEEKLY:
+                        startDate = startDate.AddDays(7);
                         break;
-                    default:
-                        HandleOtherEvent(eventObj);
+                    case Periodcity.MONTHLY:
+                        startDate = startDate.AddMonths(1);
+                        break;
+                    case Periodcity.QUARTERLY:
+                        startDate = startDate.AddMonths(3);
+                        break;
+                    case Periodcity.YEARLY:
+                        startDate = startDate.AddYears(1);
                         break;
                 }
             }
+
+            return result;
         }
 
-        private void ConsumeHistSession(Session ses, DataTable table)
+        /// <summary>
+        /// Historical Requests require strings - enum to string converter
+        /// </summary>
+        /// <param name="period"></param>
+        /// <returns></returns>
+        private string PeriodicityHelper(Periodcity period)
         {
-            bool continueToLoop = true;
-
-            while (continueToLoop)
+            switch (period)
             {
-                Event eventObj = ses.NextEvent();
-                switch (eventObj.Type)
-                {
-                    case Event.EventType.RESPONSE: // final response
-                        continueToLoop = false;
-                        HandleHistResponse(eventObj, table);
-                        break;
-                    case Event.EventType.PARTIAL_RESPONSE:
-                        HandleHistResponse(eventObj, table);
-                        break;
-                    default:
-                        HandleOtherEvent(eventObj);
-                        break;
-                }
+                case Periodcity.DAILY:
+                    return "DAILY";
+                case Periodcity.WEEKLY:
+                    return "WEEKLY";
+                case Periodcity.MONTHLY:
+                    return "MONTHLY";
+                case Periodcity.QUARTERLY:
+                    return "QUARTERLY";
+                case Periodcity.YEARLY:
+                    return "YEARLY";
+                default:
+                    throw new ArgumentException("what period did you jimmy in here");
             }
+
         }
 
-        public bool DataTableToCSV(DataTable dtSource, StreamWriter writer, bool includeHeader)
+        /// <summary>
+        /// Helper method to convert Datetime to valid Bloomberg String
+        /// </summary>
+        /// <param name="date"></param>
+        /// <returns>YYYYMMDD Date string</returns>
+        private string BloombergDateHelper(DateTime date)
+        {
+            return date.Year.ToString("D4") + date.Month.ToString("D2") + date.Day.ToString("D2");
+        }
+
+
+        //////////////////////////////////////////////
+        //                                          //
+        //  HELPER FUNCTIONS FOR OUTPUT             //
+        //                                          //
+        //////////////////////////////////////////////
+
+        /// <summary>
+        /// LINQ query that writes CSV to StreamWriter, stolen from SO
+        /// </summary>
+        /// <param name="dtSource"></param>
+        /// <param name="writer"></param>
+        /// <param name="includeHeader"></param>
+        /// <returns>True or False if write occured</returns>
+        private bool DataTableToCSV(DataTable dtSource, StreamWriter writer, bool includeHeader)
         {
             if (dtSource == null || writer == null) return false;
 
@@ -546,7 +708,11 @@ namespace BloombergConnection
         }
 
 
-        public void Logger(string lines)
+        /// <summary>
+        /// Simple logging utility
+        /// </summary>
+        /// <param name="lines"></param>
+        private void Logger(string lines)
         {
             using (StreamWriter file = new StreamWriter(logFile, true))
             {
