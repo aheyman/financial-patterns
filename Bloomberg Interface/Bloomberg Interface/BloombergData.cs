@@ -243,9 +243,10 @@ namespace BloombergConnection
         /// <param name="table"></param>
         public void GenerateHistoricalRequest(Data formattedData, DataTable table)
         {
-            AppSettingsSection settings = new AppSettingsSection();
+            string ipAddress = ConfigurationManager.AppSettings["IPAddress"];
+            int port = int.Parse(ConfigurationManager.AppSettings["port"]);
 
-            using (Session sess = StartSession(settings.Settings["IPAddress"].ToString(), int.Parse(settings.Settings["port"].ToString()), refData))
+            using (Session sess = StartSession(ipAddress, port, refData))
             {
                 Service refDataSvc = sess.GetService(refData);
                 Request request = refDataSvc.CreateRequest(formattedData.TypeOfRequest);
@@ -298,11 +299,13 @@ namespace BloombergConnection
         private void GenerateReferenceRequest(Data formattedData, DataTable table)
         {
             List<string> daysToOverride = GetDateRange(formattedData.StartDate, formattedData.EndDate, Periodcity.QUARTERLY);
-            AppSettingsSection settings = new AppSettingsSection();
+
+            string ipAddress = ConfigurationManager.AppSettings["IPAddress"];
+            int port = int.Parse(ConfigurationManager.AppSettings["port"]);
 
             foreach (string str in daysToOverride)
             {
-                using (Session sess = StartSession(settings.Settings["IPAddress"].ToString(), int.Parse(settings.Settings["port"].ToString()), refData))
+                using (Session sess = StartSession(ipAddress, port, refData))
                 {
                     Service refdata = sess.GetService(refData);
                     Request req = refdata.CreateRequest(formattedData.TypeOfRequest);
