@@ -9,10 +9,10 @@
         Background="{DynamicResource MaterialDesignPaper}"
         FontFamily="pack://application:,,,/MaterialDesignThemes.Wpf;component/Resources/Roboto/#Roboto"
 
-        Title="BloombergApp" Height="373.522" Width="713.68">
-    <Grid Width="600" Height="319" VerticalAlignment="Center" HorizontalAlignment="Center">
+        Title="BloombergApp" Height="500" Width="800">
+    <Grid Width="600" Height="350" VerticalAlignment="Center" HorizontalAlignment="Center">
         <Grid.RowDefinitions>
-            <RowDefinition Height="70*"/>
+            <RowDefinition Height="200*"/>
             <RowDefinition Height="70*"/>
             <RowDefinition Height="70*"/>
             <RowDefinition Height="70*"/>
@@ -30,6 +30,19 @@
             <RadioButton Margin="5" Name="hisReq" IsChecked="True">Historical Request</RadioButton>
             <RadioButton Margin="5" Name="refReq" >Reference Request</RadioButton>
         </StackPanel>
+
+
+        <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Center">
+
+            <RadioButton Name="rb0" GroupName="period" Tag="0">Daily</RadioButton>
+            <RadioButton Name="rb1" GroupName="period" Tag="1">Weekly</RadioButton>
+            <RadioButton Name="rb2" GroupName="period" Tag="2">Monthly</RadioButton>
+            <RadioButton Name="rb3" GroupName="period" Tag="3">Quarterly</RadioButton>
+            <RadioButton Name="rb4" GroupName="period" Tag="4">Yearly</RadioButton>
+        </StackPanel>
+        
+
+      
 
         <Label Name="tickLabel" FontSize="16" FontWeight="Bold" Grid.Column="0" Grid.Row="1" VerticalAlignment="Bottom" HorizontalAlignment="Center" >Tickers</Label>
         <TextBox Name="tickBox" Grid.Column="1" Grid.Row="1" />

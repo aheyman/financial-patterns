@@ -3,8 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
-
-
+using System.Windows.Data;
 
 namespace BloombergConnection
 {
@@ -60,7 +59,7 @@ namespace BloombergConnection
         {
 
             BloombergData req = new BloombergData();
-            Data blah;
+            Data reqData;
 
             bool check = hisReq.IsChecked ?? false;
             
@@ -68,30 +67,35 @@ namespace BloombergConnection
             string tickers = tickBox.Text;
             string fields = fieldBox.Text;
             DateTime startDate = startDay.DisplayDate;
-            DateTime endDate = startDay.DisplayDate;
+            DateTime endDate = endDay.DisplayDate;
+            Periodcity period = (Periodcity)SelectedRadioValue<int>(0, rb0, rb1, rb2, rb3);
 
-            string bbgStartDate = BloombergDate(startDate);
-            string bbgEndDate = BloombergDate(endDate);
+
 
             if (check)
             {
-                blah = new HistoricalData();
-                blah.AddToDict("startDate", bbgStartDate);
-                blah.AddToDict("startDate", bbgEndDate);
-                blah.AddToDict("securities", ParseCSV(tickers));
-                blah.AddToDict("fields", ParseCSV(fields));
+                reqData = new HistoricalData();
+                reqData.StartDate = startDate;
+                reqData.EndDate = endDate;
+                reqData.AddToDict("securities", ParseCSV(tickers));
+                reqData.AddToDict("fields", ParseCSV(fields));
+                reqData.Period = period;
             }
 
 
             else
             {
-                blah = new Reference();
-                blah.AddToDict("securities", ParseCSV(tickers));
-                blah.AddToDict("fields", ParseCSV(fields));                
+                reqData = new Reference();
+                reqData.StartDate = startDate;
+                reqData.EndDate = endDate;
+                reqData.AddToDict("securities", ParseCSV(tickers));
+                reqData.AddToDict("fields", ParseCSV(fields));
+                reqData.Period = period;
+                //TODO: PARSE THE Overrides
             }
                 
 
-            req.BloombergRequest(blah);
+            req.BloombergRequest(reqData);
         }
 
         private List<string> ParseCSV(string filePath)
@@ -110,10 +114,25 @@ namespace BloombergConnection
             return result;
         }
 
-        private string BloombergDate(DateTime dt)
+        private T SelectedRadioValue<T>(T defaultValue, params RadioButton[] buttons)
         {
-            return (dt.Year.ToString("D4") + dt.Month.ToString("D2") + dt.Day.ToString("D2"));
+            foreach (RadioButton button in buttons)
+            {
+                if (button.IsChecked == true)
+                {
+                    if (button.Tag is string && typeof(T) != typeof(string))
+                    {
+                        string value = (string)button.Tag;
+                        return (T)Convert.ChangeType(value, typeof(T));
+                    }
+
+                    return (T)button.Tag;
+                }
+            }
+
+            return defaultValue;
         }
 
     }
+
 }

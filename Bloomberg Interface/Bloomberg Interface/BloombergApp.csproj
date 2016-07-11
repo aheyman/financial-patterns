@@ -34,6 +34,9 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
+  <PropertyGroup>
+    <StartupObject>BloombergConnection.App</StartupObject>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="Bloomberglp.Blpapi">
       <HintPath>..\..\..\..\..\Downloads\blpapi_dotnet_3.8.10.1\blpapi_dotnet_3.8.10.1\bin\Bloomberglp.Blpapi.dll</HintPath>
