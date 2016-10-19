@@ -14,6 +14,8 @@
     <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <WarningLevel>4</WarningLevel>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -38,9 +40,14 @@
     <StartupObject>BloombergConnection.App</StartupObject>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>modules_financial.ico</ApplicationIcon>
+    <ApplicationIcon>
+    </ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Accord, Version=3.3.0.0, Culture=neutral, PublicKeyToken=fa1a88e29555ccf7, processorArchitecture=MSIL">
+      <HintPath>..\packages\Accord.3.3.0\lib\net45\Accord.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="Bloomberglp.Blpapi">
       <HintPath>\\svscbvuser02\users$\ajh3126\Downloads\blpapi_dotnet_3.8.10.1\blpapi_dotnet_3.8.10.1\bin\Bloomberglp.Blpapi.dll</HintPath>
     </Reference>
@@ -78,6 +85,8 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="BloombergRefactor.cs" />
+    <Compile Include="PositionTester.cs" />
     <Compile Include="TestRun.CS" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
@@ -125,12 +134,16 @@
     <Resource Include="resource\bloombergBlack.jpg" />
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="modules_financial.ico" />
-  </ItemGroup>
-  <ItemGroup>
     <Resource Include="resource\modules_financial.ico" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Import Project="..\packages\Accord.3.3.0\build\Accord.targets" Condition="Exists('..\packages\Accord.3.3.0\build\Accord.targets')" />
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\Accord.3.3.0\build\Accord.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Accord.3.3.0\build\Accord.targets'))" />
+  </Target>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
