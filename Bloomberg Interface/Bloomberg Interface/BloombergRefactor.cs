@@ -36,10 +36,13 @@ namespace Bloomberg_Interface
                     switch (line[0])
                     {
 
-                        case "historical":
+                        Data input;
 
+                        case "historical":
+                            input = new HistoricalData();
+                            break;
                         case "reference":
-                            
+                            input = new ReferenceData(); 
                             break;
                         default:
                             throw new ArgumentException("First line must be request type");
@@ -49,7 +52,12 @@ namespace Bloomberg_Interface
                     while (reader.Peek() != -1)
                     {
 
+                        //for each line, match on key value pairs
+                        //add them to the input object
+                        
                     }
+
+                    return input;
                     
 
                 }
