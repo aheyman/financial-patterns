@@ -26,7 +26,6 @@ namespace BloombergConnection
         DateTime StartDate { get; set; }
         DateTime EndDate { get; set; }
         Dictionary<string, List<string>> Data { get; }
-        void AddToDict(string key, string value);
         void AddToDict(string key, List<string> value);
         List<Overrides> Overrides { get; }
         void AddOverrides(string fieldId, string value);
@@ -60,14 +59,6 @@ namespace BloombergConnection
         };
 
         public Dictionary<string, List<string>> Data { get { return _dict; } }
-
-        public void AddToDict(string key, string value)
-        {
-            if (key.Contains("securities") || key.Contains("fields"))
-                _dict[key].Add(value);
-            else
-                _dict[key][0] = value;
-        }
 
         public void AddToDict(string key, List<string> value)
         {
@@ -112,12 +103,7 @@ namespace BloombergConnection
 
         List<Overrides> _overrides = new List<Overrides>();
         public List<Overrides> Overrides { get { return _overrides; } }
-
-        public void AddToDict(string key, string value)
-        {
-            _dict[key].Add(value);
-        }
-
+        
         public void AddToDict(string key, List<string> value)
         {
             _dict[key].AddRange(value);
@@ -300,14 +286,15 @@ namespace BloombergConnection
         {
             List<string> daysToOverride = GetDateRange(formattedData.StartDate, formattedData.EndDate, Periodcity.QUARTERLY);
 
+            //In the App.config file
             string ipAddress = ConfigurationManager.AppSettings["IPAddress"];
             int port = int.Parse(ConfigurationManager.AppSettings["port"]);
 
 
-            foreach (string str in daysToOverride)
-            {
-                using (Session sess = StartSession(ipAddress, port, refData))
+            using (Session sess = StartSession(ipAddress, port, refData)){
+                foreach (string str in daysToOverride)
                 {
+
                     Service refdata = sess.GetService(refData);
                     Request req = refdata.CreateRequest(formattedData.TypeOfRequest);
 
@@ -669,7 +656,7 @@ namespace BloombergConnection
                 case Periodcity.YEARLY:
                     return "YEARLY";
                 default:
-                    throw new ArgumentException("what period did you jimmy in here");
+                    throw new ArgumentException("what period did you finagle in here");
             }
 
         }
