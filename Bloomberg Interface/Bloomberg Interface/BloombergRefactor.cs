@@ -21,28 +21,26 @@ namespace Bloomberg_Interface
         /// </summary>
         /// <param name="inputFile"></param>
         /// <returns></returns>
-        static Data ParseFile(string inputFile)
+        static RequestStruct ParseFile(string inputFile)
         {
-            var result = new List<string>();
-
             using (StreamReader reader = new StreamReader(inputFile))
             {
 
                 string[] line = reader.ReadLine().Split('=');
+
                 if (line.Length != 2)
                     throw new ArgumentException("File not formatted correctly");
                 else
                 {
+                    RequestStruct input = new RequestStruct();
                     switch (line[0])
                     {
-
-                        Data input;
-
+                        
                         case "historical":
-                            input = new HistoricalData();
+                            input.RequestType = "historicaldatarequest";
                             break;
                         case "reference":
-                            input = new ReferenceData(); 
+                            input.RequestType = "referencedatarequest";
                             break;
                         default:
                             throw new ArgumentException("First line must be request type");
@@ -52,8 +50,7 @@ namespace Bloomberg_Interface
                     while (reader.Peek() != -1)
                     {
 
-                        //for each line, match on key value pairs
-                        //add them to the input object
+                        
                         
                     }
 

@@ -16,118 +16,26 @@ using SessionOptions = Bloomberglp.Blpapi.SessionOptions;
 
 
 namespace BloombergConnection
-{
-    /// <summary>
-    /// Interface for Requests
-    /// </summary>
-    public interface Data
+{ 
+
+    public class RequestStruct
     {
-        Periodcity Period { get; set; }
-        DateTime StartDate { get; set; }
-        DateTime EndDate { get; set; }
-        Dictionary<string, List<string>> Data { get; }
-        void AddToDict(string key, List<string> value);
-        List<Overrides> Overrides { get; }
-        void AddOverrides(string fieldId, string value);
-        string TypeOfRequest { get; }
 
-    }
-
-    /// <summary>
-    /// Class for submitting Bloomberg Historical Requests
-    /// </summary>
-    public class HistoricalData : Data
-    {
-        DateTime _start;
-        public DateTime StartDate { get { return _start; } set { _start = value; } }
-
-
-        DateTime _end;
-        public DateTime EndDate { get { return _end; } set { _end = value; } }
-
-        public string TypeOfRequest { get { return RequestType.Historical.Value; } }
-
-        private Periodcity _period;
-        public Periodcity Period { get { return _period; } set { _period = value; } }
-
-        Dictionary<string, List<string>> _dict = new Dictionary<string, List<string>>()
+        public Dictionary<string, List<string>> Data = new Dictionary<string, List<string>>
         {
             {"securities", new List<string>() },
-            {"fields", new List<string>() },
-            {"nonTradingDayFillOption", new List<string>( ){"ACTIVE_DAYS_ONLY"}  },
-            //There are more that should be added
+            {"fields", new List<string>() }
         };
-
-        public Dictionary<string, List<string>> Data { get { return _dict; } }
-
-        public void AddToDict(string key, List<string> value)
-        {
-            if (key.Contains("securities") || key.Contains("fields"))
-                _dict[key].AddRange(value);
-            else
-                _dict[key][0] = value[0];
-        }
-
-        public List<Overrides> Overrides { get { return null; } }
-
-        public void AddOverrides(string fieldId, string value)
-        {
-            throw new FieldAccessException("Historical Request can't be overriden");
-        }
-
+        public List<string> securities;
+        public List<string> fields;
+        public Periodcity Period;
+        public string RequestType;
+        public DateTime StartDate;
+        public DateTime EndDate;
 
     }
 
-    /// <summary>
-    /// Class for Submitting Bloomberg Reference Requests
-    /// </summary>
-    public class Reference : Data
-    {
-        DateTime _start;
-        public DateTime StartDate { get { return _start; } set { _start = value; } }
-
-        DateTime _end;
-        public DateTime EndDate { get { return _end; } set { _end = value; } }
-
-        public string TypeOfRequest { get { return RequestType.Reference.Value; } }
-
-        private Periodcity _period;
-        public Periodcity Period { get { return _period; } set { _period = value; } }
-
-        Dictionary<string, List<string>> _dict = new Dictionary<string, List<string>>()
-        {
-            {"securities", new List<string>() },
-            {"fields", new List<string>() },
-        };
-        public Dictionary<string, List<string>> Data { get { return _dict; } }
-
-        List<Overrides> _overrides = new List<Overrides>();
-        public List<Overrides> Overrides { get { return _overrides; } }
-        
-        public void AddToDict(string key, List<string> value)
-        {
-            _dict[key].AddRange(value);
-        }
-
-        public void AddOverrides(string fieldId, string value)
-        {
-            _overrides.Add(new Overrides(fieldId, value));
-
-        }
-
-    }
-
-    // Helper Classes
-    public class RequestType
-    {
-        private RequestType(string value) { Value = value; }
-
-        public string Value { get; }
-
-        public static RequestType Historical { get { return new RequestType("HistoricalDataRequest"); } }
-        public static RequestType Reference { get { return new RequestType("ReferenceDataRequest"); } }
-
-    }
+    
 
     public enum Periodcity
     {
@@ -136,24 +44,6 @@ namespace BloombergConnection
         MONTHLY,
         QUARTERLY,
         YEARLY
-    }
-
-
-    /// <summary>
-    /// Essential a well-organized tuple
-    /// </summary>
-    public class Overrides
-    {
-        private string _fieldId;
-        public string Field { get { return _fieldId; } set { _fieldId = value; } }
-        private string _valueId;
-        public string Value { get { return _valueId; } set { _valueId = value; } }
-
-        public Overrides(string field, string value)
-        {
-            _fieldId = field;
-            _valueId = value;
-        }
     }
 
 
@@ -169,22 +59,6 @@ namespace BloombergConnection
         string logFile;
 
 
-        public BloombergData()
-        {
-            // Initalize the logger
-            string filePath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\Error Log\";
-
-            if (!Directory.Exists(filePath))
-                Directory.CreateDirectory(filePath);
-
-            logFile = filePath + "log_" + DateTime.Now.ToShortDateString().Replace('/', '-') + ".txt";
-            output = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\request_" + DateTime.Now.ToShortDateString().Replace('/', '-') + ".txt";
-        }
-
-        /// <summary>
-        /// Allows for a user to specify output
-        /// </summary>
-        /// <param name="outputLoc"></param>
         public BloombergData(string outputLoc)
         {
             // Initalize the logger
@@ -194,28 +68,32 @@ namespace BloombergConnection
                 Directory.CreateDirectory(filePath);
 
             logFile = filePath + "log_" + DateTime.Now.ToShortDateString().Replace('/', '-') + ".txt";
-            output = outputLoc;
+
+            if (outputLoc == null)
+                output = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\request_" + DateTime.Now.ToShortDateString().Replace('/', '-') + ".txt";
+            else
+                output = outputLoc;
         }
 
 
 
-        public void BloombergRequest(Data formattedData)
+        public void BloombergRequest(RequestStruct formattedData)
         {
 
             DataTable table = new DataTable();
             table.Columns.Add("date");
             table.Columns.Add("security");
 
-            foreach (string str in formattedData.Data["fields"])
+            foreach (string str in formattedData.fields )
                 table.Columns.Add(str);
 
-            switch (formattedData.TypeOfRequest)
+            switch (formattedData.RequestType.ToLower())
             {
-                case "HistoricalDataRequest":
+                case "historicaldatarequest":
                     GenerateHistoricalRequest(formattedData, table);
                     break;
 
-                case "ReferenceDataRequest":
+                case "referencedatarequest":
                     GenerateReferenceRequest(formattedData, table);
                     break;
             }
@@ -227,7 +105,7 @@ namespace BloombergConnection
         /// </summary>
         /// <param name="formattedData"></param>
         /// <param name="table"></param>
-        public void GenerateHistoricalRequest(Data formattedData, DataTable table)
+        public void GenerateHistoricalRequest(RequestStruct formattedData, DataTable table)
         {
             string ipAddress = ConfigurationManager.AppSettings["IPAddress"];
             int port = int.Parse(ConfigurationManager.AppSettings["port"]);
@@ -235,25 +113,20 @@ namespace BloombergConnection
             using (Session sess = StartSession(ipAddress, port, refData))
             {
                 Service refDataSvc = sess.GetService(refData);
-                Request request = refDataSvc.CreateRequest(formattedData.TypeOfRequest);
+                Request request = refDataSvc.CreateRequest("HistoricalDataRequest");
 
-                // Securities and fields are handled same way
-                string[] standards = { "securities", "fields" };
-                foreach (string str in standards)
+                string type = "securites";
+
+                foreach (string str in formattedData.Data[type])
                 {
-                    AddSecurityOrField(request, str, formattedData.Data[str]);
-                    formattedData.Data.Remove(str);
+                    request.GetElement(type).AppendValue(str);
                 }
+                request.GetElement("fields").AppendValue("PX_LAST");
                 
-                //Any other dictionary values
-                foreach (KeyValuePair<string, List<string>> entry in formattedData.Data)
-                {
-                    if (entry.Value.Count > 0)
-                        HistoricalSession(request, entry.Key, entry.Value.ToArray()[0]);
-                }
-                HistoricalSession(request, "startDate", BloombergDateHelper(formattedData.StartDate));
-                HistoricalSession(request, "endDate", BloombergDateHelper(formattedData.EndDate));
-                HistoricalSession(request, "periodicitySelection", PeriodicityHelper(formattedData.Period));
+                request.Set("startDate", BloombergDateHelper(formattedData.StartDate));
+                request.Set("endDate", BloombergDateHelper(formattedData.EndDate));
+                request.Set("periodicitySelection", PeriodicityHelper(formattedData.Period));
+                request.Set("nonTradingDayFillOption", "NON_TRADING_WEEKDAYS");
 
                 sess.SendRequest(request, new CorrelationID(1));
 
@@ -282,7 +155,7 @@ namespace BloombergConnection
         /// </summary>
         /// <param name="formattedData"></param>
         /// <param name="table"></param>
-        private void GenerateReferenceRequest(Data formattedData, DataTable table)
+        private void GenerateReferenceRequest(RequestStruct formattedData, DataTable table)
         {
             List<string> daysToOverride = GetDateRange(formattedData.StartDate, formattedData.EndDate, Periodcity.QUARTERLY);
 
@@ -292,28 +165,33 @@ namespace BloombergConnection
 
 
             using (Session sess = StartSession(ipAddress, port, refData)){
-                foreach (string str in daysToOverride)
+                foreach (string day in daysToOverride)
                 {
 
                     Service refdata = sess.GetService(refData);
-                    Request req = refdata.CreateRequest(formattedData.TypeOfRequest);
+                    Request req = refdata.CreateRequest("ReferenceDataRequest");
 
                     // Securities and fields are handled same way
                     string[] standards = { "securities", "fields" };
                     foreach (string stra in standards)
                     {
-                        AddSecurityOrField(req, stra, formattedData.Data[stra]);
-                        formattedData.Data.Remove(str);
+                        var temp = formattedData.Data[stra];
+                        foreach (string str in temp)
+                        {
+                            req.Set(stra, str);
+                        }
+                        
                     }
 
-                    foreach (Overrides over in formattedData.Overrides)
-                        SetOverrides(req, over);
+                    Element overrides = req["overrides"];
+                    Element override1 = overrides.AppendElement();
+                    override1.SetElement("FUNDAMENTAL_PUBLIC_DATE", day);
 
-                    SetOverrides(req, new Overrides("FUNDAMENTAL_PUBLIC_DATE", str));
                     sess.SendRequest(req, new CorrelationID(1));
+
                     try
                     {
-                        ConsumeRefSession(sess, table, str);
+                        ConsumeRefSession(sess, table, day);
                     }
                     catch (Exception e)
                     {
@@ -554,44 +432,6 @@ namespace BloombergConnection
         //  Helper functions for formatting requests    //
         //                                              //
         //////////////////////////////////////////////////
-
-
-        /// <summary>
-        /// Helper method for adding securities and fields to requests
-        /// </summary>
-        /// <param name="request"></param>
-        /// <param name="key"></param>
-        /// <param name="pairToAdd"></param>
-        private void AddSecurityOrField(Request request, string key, List<string> pairToAdd)
-        {
-            foreach (string t in pairToAdd)
-                request.GetElement(key).AppendValue(t);
-        }
-
-        /// <summary>
-        /// Helper method to set parameters for Historical Requests
-        /// </summary>
-        /// <param name="request"></param>
-        /// <param name="key"></param>
-        /// <param name="value"></param>
-        private void HistoricalSession(Request request, string key, string value)
-        {
-            request.Set(key, value);
-        }
-
-        /// <summary>
-        /// Overrides are ugly and set ug-ily
-        /// </summary>
-        /// <param name="request"></param>
-        /// <param name="over"></param>
-        private void SetOverrides(Request request, Overrides over)
-        {
-            Element overrides = request.GetElement("overrides");
-            Element override1 = overrides.AppendElement();
-
-            override1.SetElement("fieldId", over.Field);
-            override1.SetElement("value", over.Value);
-        }
 
         /// <summary>
         /// Returns a list of ALL CALENDAR DAYS (INCLUDING NON TRADING AND HOLIDAYS) between two date times
