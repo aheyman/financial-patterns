@@ -178,28 +178,29 @@ namespace BloombergConnection
                     Service refdata = sess.GetService(refData);
                     Request req = refdata.CreateRequest("ReferenceDataRequest");
 
-                    // Securities and fields are handled same way
-                    string[] standards = { "securities", "fields" };
-                    foreach (string stra in standards)
-                    {
-                        var temp = formattedData.Data[stra];
-                        foreach (string str in temp)
-                        {
-                            req.GetElement(stra).AppendValue(str);
-                        }
-                        
-                    }
-
                     Element overrides = req["overrides"];
                     Element override1 = overrides.AppendElement();
                     override1.SetElement("fieldId", "FUNDAMENTAL_PUBLIC_DATE");
                     override1.SetElement("value", day);
 
-                    sess.SendRequest(req, new CorrelationID(1));
+                    var fields = formattedData.Data["fields"];
+
+                    foreach (string field in fields)
+                    {
+                        req.GetElement("fields").AppendValue(field);
+                    }
 
                     try
                     {
-                        ConsumeRefSession(sess, table, day);
+                        // Securities and fields are handled same way
+                            var temp = formattedData.Data["securities"];
+                            foreach (string str in temp)
+                            {
+                                req.GetElement("securities").AppendValue(str);
+                                sess.SendRequest(req, new CorrelationID(1));
+                                ConsumeRefSession(sess, table, day);
+                            }
+                        
                     }
                     catch (Exception e)
                     {
