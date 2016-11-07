@@ -16,7 +16,7 @@ using SessionOptions = Bloomberglp.Blpapi.SessionOptions;
 
 
 namespace BloombergConnection
-{ 
+{
 
     public class RequestStruct
     {
@@ -86,10 +86,16 @@ namespace BloombergConnection
             table.Columns.Add("date");
             table.Columns.Add("security");
 
-            foreach (string str in formattedData.Data["fields"] )
+            foreach (string str in formattedData.Data["fields"])
                 table.Columns.Add(str);
 
-            switch (formattedData.Type)
+            string ipAddress = ConfigurationManager.AppSettings["IPAddress"];
+            int port = int.Parse(ConfigurationManager.AppSettings["port"]);
+
+            using (Session sess = StartSession(ipAddress, port, refData))
+            {
+
+                switch (formattedData.Type)
             {
                 case RequestType.HISTORICAL:
                     table = GenerateHistoricalRequest(formattedData, table, genCSV);
@@ -99,6 +105,7 @@ namespace BloombergConnection
                     table = GenerateReferenceRequest(formattedData, table, genCSV);
                     break;
             }
+                }
 
             return table;
 
@@ -119,14 +126,14 @@ namespace BloombergConnection
                 Service refDataSvc = sess.GetService(refData);
                 Request request = refDataSvc.CreateRequest("HistoricalDataRequest");
 
-                string[] type = { "securities", "fields"};
+                string[] type = { "securities", "fields" };
 
                 foreach (string str in type)
                 {
                     foreach (string value in formattedData.Data[str])
-                    request.GetElement(str).AppendValue(value);
+                        request.GetElement(str).AppendValue(value);
                 }
-                                
+
                 request.Set("startDate", BloombergDateHelper(formattedData.StartDate));
                 request.Set("endDate", BloombergDateHelper(formattedData.EndDate));
                 request.Set("periodicitySelection", PeriodEnumToSting(formattedData.Period));
@@ -137,7 +144,7 @@ namespace BloombergConnection
 
                 try
                 {
-                    ConsumeHistSession(sess, table);
+                    ConsumeSession(sess, table, null);
                 }
                 catch (Exception e)
                 {
@@ -170,44 +177,46 @@ namespace BloombergConnection
             //In the App.config file
             string ipAddress = ConfigurationManager.AppSettings["IPAddress"];
             int port = int.Parse(ConfigurationManager.AppSettings["port"]);
-            foreach (string day in daysToOverride)
+
+            // this is a work around, for some reason, when I send mulitple securities, I only get one back in the messages
+            // I'm certain some additional investigation can resolve this
+            foreach (string security in formattedData.Data["securities"])
             {
-                using (Session sess = StartSession(ipAddress, port, refData)){
-   
-
-                    Service refdata = sess.GetService(refData);
-                    Request req = refdata.CreateRequest("ReferenceDataRequest");
-
-                    Element overrides = req["overrides"];
-                    Element override1 = overrides.AppendElement();
-                    override1.SetElement("fieldId", "FUNDAMENTAL_PUBLIC_DATE");
-                    override1.SetElement("value", day);
-
-                    var fields = formattedData.Data["fields"];
-
-                    foreach (string field in fields)
+                // For each override day
+                foreach (string day in daysToOverride)
+                {
+                    using (Session sess = StartSession(ipAddress, port, refData))
                     {
-                        req.GetElement("fields").AppendValue(field);
-                    }
+                        Service refdata = sess.GetService(refData);
+                        Request req = refdata.CreateRequest("ReferenceDataRequest");
 
-                    try
-                    {
-                        // Securities and fields are handled same way
-                            var temp = formattedData.Data["securities"];
-                            foreach (string str in temp)
-                            {
-                                req.GetElement("securities").AppendValue(str);
-                                sess.SendRequest(req, new CorrelationID(1));
-                                ConsumeRefSession(sess, table, day);
-                            }
-                        
-                    }
-                    catch (Exception e)
-                    {
-                        Logger(e.Message);
+                        req.GetElement("securities").AppendValue(security);
+
+                        foreach (string val in formattedData.Data["fields"])
+                        {
+                            req.GetElement("fields").AppendValue(val);
+                        }
+                                
+
+                        Element overrides = req["overrides"];
+                        Element override1 = overrides.AppendElement();
+                        override1.SetElement("fieldId", "FUNDAMENTAL_PUBLIC_DATE");
+                        override1.SetElement("value", day);
+
+                        try
+                        {
+                            sess.SendRequest(req, new CorrelationID(1));
+                            ConsumeSession(sess, table, day);
+                        }
+                        catch (Exception e)
+                        {
+                            Logger(e.Message);
+                        }
                     }
                 }
             }
+
+            
 
             if (genCSV)
             {
@@ -254,7 +263,7 @@ namespace BloombergConnection
         /// <param name="ses"></param>
         /// <param name="table"></param>
         /// <param name="date"></param>
-        private void ConsumeRefSession(Session ses, DataTable table, string date)
+        private void ConsumeSession(Session ses, DataTable table, string date)
         {
             bool continueToLoop = true;
 
@@ -265,10 +274,10 @@ namespace BloombergConnection
                 {
                     case Event.EventType.RESPONSE: // final response
                         continueToLoop = false;
-                        HandleRefResponse(eventObj, table, date);
+                        HandleResponse(eventObj, table, date);
                         break;
                     case Event.EventType.PARTIAL_RESPONSE:
-                        HandleRefResponse(eventObj, table, date);
+                        HandleResponse(eventObj, table, date);
                         break;
                     default:
                         HandleOtherEvent(eventObj);
@@ -276,36 +285,7 @@ namespace BloombergConnection
                 }
             }
         }
-
-        /// <summary>
-        /// Consumes Historical Reference and writes output to a table
-        /// </summary>
-        /// <param name="ses"></param>
-        /// <param name="table"></param>
-        private void ConsumeHistSession(Session ses, DataTable table)
-        {
-            bool continueToLoop = true;
-
-            while (continueToLoop)
-            {
-                Event eventObj = ses.NextEvent();
-                switch (eventObj.Type)
-                {
-                    case Event.EventType.RESPONSE: // final response
-                        continueToLoop = false;
-                        HandleHistResponse(eventObj, table);
-                        break;
-                    case Event.EventType.PARTIAL_RESPONSE:
-                        HandleHistResponse(eventObj, table);
-                        break;
-                    default:
-                        HandleOtherEvent(eventObj);
-                        break;
-                }
-            }
-        }
-
-
+      
 
         /// <summary>
         /// Event handler for !Event.Type.Response/Partial Response
@@ -327,72 +307,13 @@ namespace BloombergConnection
             }
         }
 
-
-        /// <summary>
-        /// Writes bloomberg historical responses to a Datatable
-        /// </summary>
-        /// <param name="eventObj"></param>
-        /// <param name="table"></param>
-        private void HandleHistResponse(Event eventObj, DataTable table)
-        {
-
-            foreach (Message message in eventObj.GetMessages()) // go through each message in the Event
-            {
-
-                //responseError
-                Element HistoricalResponse = message.AsElement;
-                if (HistoricalResponse.HasElement("responseError")) // if there is an error, quit
-                {
-                    Logger(HistoricalResponse.GetElement("responseError").GetElementAsString("message"));
-                    Logger("Error in the response");
-                    Environment.Exit(1);
-                }
-
-                //securityData
-                Element securityDataArray = HistoricalResponse.GetElement("securityData");
-
-
-                string companyName = securityDataArray.GetElementAsString("security");
-                int sequenceNumber = securityDataArray.GetElementAsInt32("sequenceNumber");
-
-                if (securityDataArray.HasElement("securityError"))
-                {
-                    Element securityError = securityDataArray.GetElement("securityError");
-                    Logger("* security =" + companyName + " : " + securityError.GetElementAsString("message"));
-                }
-                else
-                {
-                    Element fieldDataArray = securityDataArray.GetElement("fieldData");
-                    int numItems = fieldDataArray.NumValues;
-
-                    for (int i = 0; i < numItems; i++)
-                    {
-                        Element fieldData = fieldDataArray.GetValueAsElement(i);
-                        DataRow row = table.NewRow();
-                        row["security"] = companyName;
-                        for (int k = 0; k < fieldData.NumElements; k++)
-                        {
-                            Element field = fieldData.GetElement(k);
-                            row[field.Name.ToString()] = field.GetValueAsString();
-                        }
-                        table.Rows.Add(row);
-                    }
-
-
-                }
-
-            }// end of messages
-
-        }
-
-
         /// <summary>
         /// Adds Bloomberg request data to a DataTable for Reference Requests
         /// </summary>
         /// <param name="eventObj"></param>
         /// <param name="table"></param>
         /// <param name="date"></param>
-        private void HandleRefResponse(Event eventObj, DataTable table, string date)
+        private void HandleResponse(Event eventObj, DataTable table, string date)
         {
 
             foreach (Message message in eventObj.GetMessages()) // go through each message in the Event
@@ -423,7 +344,12 @@ namespace BloombergConnection
 
                     DataRow row = table.NewRow();
                     row["security"] = companyName;
-                    row["date"] = date;
+
+                    // if the date is not null, it must be a reference request
+                    if (date != null)
+                    {
+                        row["date"] = date;
+                    }
 
                     for (int j = 0; j < fieldData.NumElements; j++)
                     {
@@ -484,7 +410,6 @@ namespace BloombergConnection
                         break;
                 }
             }
-
             return result;
         }
 
