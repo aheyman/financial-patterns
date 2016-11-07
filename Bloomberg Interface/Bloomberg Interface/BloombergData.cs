@@ -94,21 +94,18 @@ namespace BloombergConnection
 
             using (Session sess = StartSession(ipAddress, port, refData))
             {
-
                 switch (formattedData.Type)
-            {
-                case RequestType.HISTORICAL:
-                    table = GenerateHistoricalRequest(formattedData, table, genCSV);
-                    break;
+                {
+                    case RequestType.HISTORICAL:
+                        table = GenerateHistoricalRequest(formattedData, table, genCSV);
+                        break;
 
-                case RequestType.REFERENCE:
-                    table = GenerateReferenceRequest(formattedData, table, genCSV);
-                    break;
-            }
+                    case RequestType.REFERENCE:
+                        table = GenerateReferenceRequest(formattedData, table, genCSV);
+                        break;
                 }
-
+            }
             return table;
-
         }
 
         /// <summary>
@@ -125,7 +122,6 @@ namespace BloombergConnection
             {
                 Service refDataSvc = sess.GetService(refData);
                 Request request = refDataSvc.CreateRequest("HistoricalDataRequest");
-
                 string[] type = { "securities", "fields" };
 
                 foreach (string str in type)
@@ -193,10 +189,7 @@ namespace BloombergConnection
                         req.GetElement("securities").AppendValue(security);
 
                         foreach (string val in formattedData.Data["fields"])
-                        {
                             req.GetElement("fields").AppendValue(val);
-                        }
-                                
 
                         Element overrides = req["overrides"];
                         Element override1 = overrides.AppendElement();
@@ -216,14 +209,10 @@ namespace BloombergConnection
                 }
             }
 
-            
-
             if (genCSV)
             {
                 using (StreamWriter write = new StreamWriter(output))
-                {
                     DataTableToCSV(table, write, true);
-                }
             }
 
             return table;
@@ -242,6 +231,7 @@ namespace BloombergConnection
             sessionOptions.ServerHost = ipAddress;
             sessionOptions.ServerPort = port;
             Session session = new Session(sessionOptions);
+
             if (!session.Start())
             {
                 Logger("Could not start session.");
@@ -285,7 +275,7 @@ namespace BloombergConnection
                 }
             }
         }
-      
+
 
         /// <summary>
         /// Event handler for !Event.Type.Response/Partial Response
@@ -298,8 +288,7 @@ namespace BloombergConnection
             {
                 Logger("correlationID=" + message.CorrelationID);
                 Logger("messageType=" + message.MessageType);
-                if (Event.EventType.SESSION_STATUS == eventObj.Type &&
-                    message.MessageType.Equals("SessionTerminated"))
+                if (Event.EventType.SESSION_STATUS == eventObj.Type && message.MessageType.Equals("SessionTerminated"))
                 {
                     Logger("Terminating: " + message.TopicName);
                     Environment.Exit(1);
@@ -347,9 +336,7 @@ namespace BloombergConnection
 
                     // if the date is not null, it must be a reference request
                     if (date != null)
-                    {
                         row["date"] = date;
-                    }
 
                     for (int j = 0; j < fieldData.NumElements; j++)
                     {
@@ -358,10 +345,7 @@ namespace BloombergConnection
                     }
                     table.Rows.Add(row);
                 }
-
-
             }// end of messages
-
         }
 
 
