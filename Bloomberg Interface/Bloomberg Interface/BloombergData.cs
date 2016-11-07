@@ -26,16 +26,18 @@ namespace BloombergConnection
             {"securities", new List<string>() },
             {"fields", new List<string>() }
         };
-        public List<string> securities;
-        public List<string> fields;
         public Periodcity Period;
-        public string RequestType;
+        public RequestType Type;
         public DateTime StartDate;
         public DateTime EndDate;
 
     }
 
-    
+    public enum RequestType
+    {
+        HISTORICAL,
+        REFERENCE
+    }
 
     public enum Periodcity
     {
@@ -77,26 +79,28 @@ namespace BloombergConnection
 
 
 
-        public void BloombergRequest(RequestStruct formattedData)
+        public DataTable BloombergRequest(RequestStruct formattedData, bool genCSV)
         {
 
             DataTable table = new DataTable();
             table.Columns.Add("date");
             table.Columns.Add("security");
 
-            foreach (string str in formattedData.fields )
+            foreach (string str in formattedData.Data["fields"] )
                 table.Columns.Add(str);
 
-            switch (formattedData.RequestType.ToLower())
+            switch (formattedData.Type)
             {
-                case "historicaldatarequest":
-                    GenerateHistoricalRequest(formattedData, table);
+                case RequestType.HISTORICAL:
+                    table = GenerateHistoricalRequest(formattedData, table, genCSV);
                     break;
 
-                case "referencedatarequest":
-                    GenerateReferenceRequest(formattedData, table);
+                case RequestType.REFERENCE:
+                    table = GenerateReferenceRequest(formattedData, table, genCSV);
                     break;
             }
+
+            return table;
 
         }
 
@@ -105,7 +109,7 @@ namespace BloombergConnection
         /// </summary>
         /// <param name="formattedData"></param>
         /// <param name="table"></param>
-        public void GenerateHistoricalRequest(RequestStruct formattedData, DataTable table)
+        private DataTable GenerateHistoricalRequest(RequestStruct formattedData, DataTable table, bool genCSV)
         {
             string ipAddress = ConfigurationManager.AppSettings["IPAddress"];
             int port = int.Parse(ConfigurationManager.AppSettings["port"]);
@@ -121,12 +125,12 @@ namespace BloombergConnection
                 {
                     request.GetElement(type).AppendValue(str);
                 }
-                request.GetElement("fields").AppendValue("PX_LAST");
-                
+                                
                 request.Set("startDate", BloombergDateHelper(formattedData.StartDate));
                 request.Set("endDate", BloombergDateHelper(formattedData.EndDate));
                 request.Set("periodicitySelection", PeriodicityHelper(formattedData.Period));
                 request.Set("nonTradingDayFillOption", "NON_TRADING_WEEKDAYS");
+                request.Set("nonTradingDayFillMethod", "PREVIOUS_VALUE");
 
                 sess.SendRequest(request, new CorrelationID(1));
 
@@ -138,14 +142,17 @@ namespace BloombergConnection
                 {
                     Logger(e.Message);
                 }
-                finally
+            }
+
+            if (genCSV)
+            {
+                using (StreamWriter write = new StreamWriter(output))
                 {
-                    using (StreamWriter write = new StreamWriter(output))
-                    {
-                        DataTableToCSV(table, write, true);
-                    }
+                    DataTableToCSV(table, write, true);
                 }
             }
+
+            return table;
 
         }
 
@@ -155,14 +162,13 @@ namespace BloombergConnection
         /// </summary>
         /// <param name="formattedData"></param>
         /// <param name="table"></param>
-        private void GenerateReferenceRequest(RequestStruct formattedData, DataTable table)
+        private DataTable GenerateReferenceRequest(RequestStruct formattedData, DataTable table, bool genCSV)
         {
             List<string> daysToOverride = GetDateRange(formattedData.StartDate, formattedData.EndDate, Periodcity.QUARTERLY);
 
             //In the App.config file
             string ipAddress = ConfigurationManager.AppSettings["IPAddress"];
             int port = int.Parse(ConfigurationManager.AppSettings["port"]);
-
 
             using (Session sess = StartSession(ipAddress, port, refData)){
                 foreach (string day in daysToOverride)
@@ -197,15 +203,18 @@ namespace BloombergConnection
                     {
                         Logger(e.Message);
                     }
-                    finally
-                    {
-                        using (StreamWriter write = new StreamWriter(output))
-                        {
-                            DataTableToCSV(table, write, true);
-                        }
-                    }
                 }
             }
+
+            if (genCSV)
+            {
+                using (StreamWriter write = new StreamWriter(output))
+                {
+                    DataTableToCSV(table, write, true);
+                }
+            }
+
+            return table;
         }
 
         /// <summary>
