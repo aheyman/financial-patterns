@@ -6,14 +6,17 @@ using System.Threading.Tasks;
 using BloombergConnection;
 using System.IO;
 
-namespace BloombergFileWrapper
+namespace BloombergRequest
 {
-    class BloombergParse
+    class BloombergFromFile
     {
 
         static void Main(string[] args)
         {
-            RequestStruct request = ParseFile(args[0]);
+            string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            string input = @"rawvalues.cfg";
+
+            RequestStruct request = ParseFile(Path.Combine(desktop,input));
             BloombergData data = new BloombergData(null);
             var ans = data.BloombergRequest(request, true);
 
@@ -35,7 +38,7 @@ namespace BloombergFileWrapper
                 else
                 {
                     RequestStruct input = new RequestStruct();
-                    switch (line[0].ToLower())
+                    switch (line[1].ToLower())
                     {
                         
                         case "historical":
@@ -60,10 +63,13 @@ namespace BloombergFileWrapper
                                 input.EndDate = Convert.ToDateTime(line[1]);
                                 break;
                             case "securities":
-                                input.Data.Add("securities", line[1].Split(',').ToList());
+                                input.Data["securities"]= line[1].Split(',').ToList();
                                 break;
                             case "fields":
-                                input.Data.Add("fields", line[1].Split(',').ToList());
+                                input.Data["fields"] = line[1].Split(',').ToList();
+                                break;
+                            case "periodicity":
+                                input.Period = BloombergData.StringToPeriodEnum(line[1]);
                                 break;
                             default:
                                 throw new ArgumentException("unknown key");
@@ -73,7 +79,5 @@ namespace BloombergFileWrapper
                 }
             }
         }
-
-
     } // end of class
 } // end of namespace

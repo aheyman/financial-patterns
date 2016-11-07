@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using BloombergConnection;
 
-namespace BloombergFileWrapper
+namespace BloombergRequest
 {
     class PositionTester
     {
@@ -15,11 +15,17 @@ namespace BloombergFileWrapper
         public static void Main(string[] args)
         {
             PositionTester tes = new PositionTester();
-            var ans = tes.GenerateTable(@"C:\Users\Andrew\Desktop\position.request");
+            string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            string input = @"position.request";
+            string output = @"position_results.csv";
+            var ans = tes.GenerateTable(Path.Combine(desktop, input));
             ans = tes.PopulateTable(ans);
 
-            StreamWriter write = new StreamWriter(@"C:\Users\Andrew\Desktop\tester.csv");
-            tes.DataTableToCSV(ans, write, true);
+            using (StreamWriter write = new StreamWriter(Path.Combine(desktop, output)))
+            {
+                BloombergData.DataTableToCSV(ans, write, true);
+            }
+
 
         }
 
@@ -66,7 +72,7 @@ namespace BloombergFileWrapper
         public DataTable PopulateTable(DataTable table)
         {
             DataTable result;
-           foreach  (DataRow row in table.Rows)
+            foreach (DataRow row in table.Rows)
             {
 
                 int[] months = { 0, 1, 3, 6, 12, 24 };
@@ -75,7 +81,7 @@ namespace BloombergFileWrapper
                 DateTime start = (DateTime)row["StartDate"];
                 int counter = 0;
 
-                foreach ( int month in months)
+                foreach (int month in months)
                 {
 
                     RequestStruct request = new RequestStruct();
@@ -91,41 +97,13 @@ namespace BloombergFileWrapper
                     result = bd.BloombergRequest(request, false);
 
                     // Column offset for first 3 populated values
-                    row[counter+3] = result.Rows[0]["PX_LAST"];
+                    row[counter + 3] = result.Rows[0]["PX_LAST"];
                     counter++;
                 }
             }
-            return table;            
+            return table;
         }
 
-
-        /// <summary>
-        /// Generates CSV from Datatable
-        /// </summary>
-        /// <param name="dtSource"></param>
-        /// <param name="writer"></param>
-        /// <param name="includeHeader"></param>
-        /// <returns></returns>
-        private bool DataTableToCSV(DataTable dtSource, StreamWriter writer, bool includeHeader)
-        {
-            if (dtSource == null || writer == null) return false;
-
-            if (includeHeader)
-            {
-                string[] columnNames = dtSource.Columns.Cast<DataColumn>().Select(column => "\"" + column.ColumnName.Replace("\"", "\"\"") + "\"").ToArray<string>();
-                writer.WriteLine(string.Join(",", columnNames));
-                writer.Flush();
-            }
-
-            foreach (DataRow row in dtSource.Rows)
-            {
-                string[] fields = row.ItemArray.Select(field => "\"" + field.ToString().Replace("\"", "\"\"") + "\"").ToArray<string>();
-                writer.WriteLine(string.Join(",", fields));
-                writer.Flush();
-            }
-
-            return true;
-        }
     } // end of class
 
 } // end of namespace

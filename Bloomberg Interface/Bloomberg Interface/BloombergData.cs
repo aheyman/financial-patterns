@@ -72,7 +72,7 @@ namespace BloombergConnection
             logFile = filePath + "log_" + DateTime.Now.ToShortDateString().Replace('/', '-') + ".txt";
 
             if (outputLoc == null)
-                output = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\request_" + DateTime.Now.ToShortDateString().Replace('/', '-') + ".txt";
+                output = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\request_" + DateTime.Now.ToShortDateString().Replace('/', '-') + ".csv";
             else
                 output = outputLoc;
         }
@@ -119,17 +119,18 @@ namespace BloombergConnection
                 Service refDataSvc = sess.GetService(refData);
                 Request request = refDataSvc.CreateRequest("HistoricalDataRequest");
 
-                string type = "securites";
+                string[] type = { "securities", "fields"};
 
-                foreach (string str in formattedData.Data[type])
+                foreach (string str in type)
                 {
-                    request.GetElement(type).AppendValue(str);
+                    foreach (string value in formattedData.Data[str])
+                    request.GetElement(str).AppendValue(value);
                 }
                                 
                 request.Set("startDate", BloombergDateHelper(formattedData.StartDate));
                 request.Set("endDate", BloombergDateHelper(formattedData.EndDate));
-                request.Set("periodicitySelection", PeriodicityHelper(formattedData.Period));
-                request.Set("nonTradingDayFillOption", "NON_TRADING_WEEKDAYS");
+                request.Set("periodicitySelection", PeriodEnumToSting(formattedData.Period));
+                request.Set("nonTradingDayFillOption", "ALL_CALENDAR_DAYS");
                 request.Set("nonTradingDayFillMethod", "PREVIOUS_VALUE");
 
                 sess.SendRequest(request, new CorrelationID(1));
@@ -169,10 +170,10 @@ namespace BloombergConnection
             //In the App.config file
             string ipAddress = ConfigurationManager.AppSettings["IPAddress"];
             int port = int.Parse(ConfigurationManager.AppSettings["port"]);
-
-            using (Session sess = StartSession(ipAddress, port, refData)){
-                foreach (string day in daysToOverride)
-                {
+            foreach (string day in daysToOverride)
+            {
+                using (Session sess = StartSession(ipAddress, port, refData)){
+   
 
                     Service refdata = sess.GetService(refData);
                     Request req = refdata.CreateRequest("ReferenceDataRequest");
@@ -184,14 +185,15 @@ namespace BloombergConnection
                         var temp = formattedData.Data[stra];
                         foreach (string str in temp)
                         {
-                            req.Set(stra, str);
+                            req.GetElement(stra).AppendValue(str);
                         }
                         
                     }
 
                     Element overrides = req["overrides"];
                     Element override1 = overrides.AppendElement();
-                    override1.SetElement("FUNDAMENTAL_PUBLIC_DATE", day);
+                    override1.SetElement("fieldId", "FUNDAMENTAL_PUBLIC_DATE");
+                    override1.SetElement("value", day);
 
                     sess.SendRequest(req, new CorrelationID(1));
 
@@ -490,7 +492,7 @@ namespace BloombergConnection
         /// </summary>
         /// <param name="period"></param>
         /// <returns></returns>
-        private string PeriodicityHelper(Periodcity period)
+        public static string PeriodEnumToSting(Periodcity period)
         {
             switch (period)
             {
@@ -510,12 +512,32 @@ namespace BloombergConnection
 
         }
 
+        public static Periodcity StringToPeriodEnum(string input)
+        {
+            switch (input.ToLower())
+            {
+                case "daily":
+                    return Periodcity.DAILY;
+                case "weekly":
+                    return Periodcity.WEEKLY;
+                case "monthly":
+                    return Periodcity.MONTHLY;
+                case "quarterly":
+                    return Periodcity.QUARTERLY;
+                case "yearly":
+                    return Periodcity.YEARLY;
+                default:
+                    throw new ArgumentException("what period did you finagle in here");
+            }
+
+        }
+
         /// <summary>
         /// Helper method to convert Datetime to valid Bloomberg String
         /// </summary>
         /// <param name="date"></param>
         /// <returns>YYYYMMDD Date string</returns>
-        private string BloombergDateHelper(DateTime date)
+        public static string BloombergDateHelper(DateTime date)
         {
             return date.Year.ToString("D4") + date.Month.ToString("D2") + date.Day.ToString("D2");
         }
@@ -534,7 +556,7 @@ namespace BloombergConnection
         /// <param name="writer"></param>
         /// <param name="includeHeader"></param>
         /// <returns>True or False if write occured</returns>
-        private bool DataTableToCSV(DataTable dtSource, StreamWriter writer, bool includeHeader)
+        public static bool DataTableToCSV(DataTable dtSource, StreamWriter writer, bool includeHeader)
         {
             if (dtSource == null || writer == null) return false;
 
