@@ -322,15 +322,15 @@ namespace BloombergConnection
                 {
                     // For historical data repsonses, there is only one security data element
                     case null:
-                        ProcessSecurityData(securityDataArray, table, date);
+                        ProcessSecurityData(securityDataArray, table, null);
                         break;
 
                     // For reference data responses, there are multiples.  Iterate through
                     default:
-                        for (int valueIndex = 0; valueIndex < securityDataArray.NumElements; valueIndex++)
+                        for (int valueIndex = 0; valueIndex < securityDataArray.NumValues; valueIndex++)
                         {
                             Element securityData = securityDataArray.GetValueAsElement(valueIndex);
-                            ProcessSecurityData(securityData, table, null);
+                            ProcessSecurityData(securityData, table, date);
                         }
 
                         break;
@@ -349,23 +349,37 @@ namespace BloombergConnection
             }
             else
             {
-                DataRow row = table.NewRow();
-                row["security"] = companyName;
-                Element fieldData = securityData.GetElement("fieldData");
 
+                Element fieldDataArray = securityData.GetElement("fieldData");
                 // if the date is not null, it must be a reference request
                 if (date != null)
-                    row["date"] = date;
-
-                for (int j = 0; j < fieldData.NumElements; j++)
                 {
-                    Element field = fieldData.GetElement(j);
-                    row[field.Name.ToString()] = field.GetValueAsString();
+                    DataRow row = table.NewRow();
+                    row["security"] = companyName;
+                    row["date"] = date;
+                    for (int fieldElms = 0; fieldElms < fieldDataArray.NumElements; fieldElms++)
+                    {
+                        Element field = fieldDataArray.GetElement(fieldElms);
+                        row[field.Name.ToString()] = field.GetValueAsString();
+                    }
+                    table.Rows.Add(row);
                 }
-                table.Rows.Add(row);
-
+                else // historical request
+                {
+                    for (int i = 0; i < fieldDataArray.NumValues; i++)
+                    {
+                        Element fieldData = fieldDataArray.GetValueAsElement(i);
+                        DataRow row = table.NewRow();
+                        row["security"] = companyName;
+                        for (int k = 0; k < fieldData.NumElements; k++)
+                        {
+                            Element field = fieldData.GetElement(k);
+                            row[field.Name.ToString()] = field.GetValueAsString();
+                        }
+                        table.Rows.Add(row);
+                    }
+                }
             }
-
         }
 
 
