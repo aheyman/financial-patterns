@@ -174,37 +174,37 @@ namespace BloombergConnection
             string ipAddress = ConfigurationManager.AppSettings["IPAddress"];
             int port = int.Parse(ConfigurationManager.AppSettings["port"]);
 
-            // this is a work around, for some reason, when I send mulitple securities, I only get one back in the messages
-            // I'm certain some additional investigation can resolve this
-            foreach (string security in formattedData.Data["securities"])
+            // For each override day
+            foreach (string day in daysToOverride)
             {
-                // For each override day
-                foreach (string day in daysToOverride)
+                using (Session sess = StartSession(ipAddress, port, refData))
                 {
-                    using (Session sess = StartSession(ipAddress, port, refData))
+                    Service refdata = sess.GetService(refData);
+                    Request req = refdata.CreateRequest("ReferenceDataRequest");
+
+
+                    var inputs = new string[] { "securities", "fields" };
+
+                    foreach (string input in inputs)
                     {
-                        Service refdata = sess.GetService(refData);
-                        Request req = refdata.CreateRequest("ReferenceDataRequest");
+                        foreach (string val in formattedData.Data[input])
+                            req.GetElement(input).AppendValue(val);
+                    }
+                    
 
-                        req.GetElement("securities").AppendValue(security);
+                    Element overrides = req["overrides"];
+                    Element override1 = overrides.AppendElement();
+                    override1.SetElement("fieldId", "FUNDAMENTAL_PUBLIC_DATE");
+                    override1.SetElement("value", day);
 
-                        foreach (string val in formattedData.Data["fields"])
-                            req.GetElement("fields").AppendValue(val);
-
-                        Element overrides = req["overrides"];
-                        Element override1 = overrides.AppendElement();
-                        override1.SetElement("fieldId", "FUNDAMENTAL_PUBLIC_DATE");
-                        override1.SetElement("value", day);
-
-                        try
-                        {
-                            sess.SendRequest(req, new CorrelationID(1));
-                            ConsumeSession(sess, table, day);
-                        }
-                        catch (Exception e)
-                        {
-                            Logger(e.Message);
-                        }
+                    try
+                    {
+                        sess.SendRequest(req, new CorrelationID(1));
+                        ConsumeSession(sess, table, day);
+                    }
+                    catch (Exception e)
+                    {
+                        Logger(e.Message);
                     }
                 }
             }
@@ -308,44 +308,64 @@ namespace BloombergConnection
             foreach (Message message in eventObj.GetMessages()) // go through each message in the Event
             {
                 //responseError
-                Element ReferenceDataResponse = message.AsElement;
-                if (ReferenceDataResponse.HasElement("responseError")) // if there is an error, quit
+                Element DataResponse = message.AsElement;
+                if (DataResponse.HasElement("responseError")) // if there is an error, quit
                 {
-                    Logger(ReferenceDataResponse.GetElement("responseError").GetElementAsString("message"));
+                    Logger(DataResponse.GetElement("responseError").GetElementAsString("message"));
                     Logger("Error in the response");
                     Environment.Exit(1);
                 }
 
-                Element securityDataArray = ReferenceDataResponse.GetElement("securityData");
-                Element securityData = securityDataArray.GetValueAsElement(0);
+                Element securityDataArray = DataResponse.GetElement("securityData");
 
-                string companyName = securityData.GetElementAsString("security");
-
-                if (securityDataArray.HasElement("securityError"))
+                switch (date)
                 {
-                    Element securityError = securityDataArray.GetElement("securityError");
-                    Logger("* security =" + companyName + " : " + securityError.GetElementAsString("message"));
-                }
-                else
-                {
+                    // For historical data repsonses, there is only one security data element
+                    case null:
+                        ProcessSecurityData(securityDataArray, table, date);
+                        break;
 
-                    Element fieldData = securityData.GetElement("fieldData");
+                    // For reference data responses, there are multiples.  Iterate through
+                    default:
+                        for (int valueIndex = 0; valueIndex < securityDataArray.NumElements; valueIndex++)
+                        {
+                            Element securityData = securityDataArray.GetValueAsElement(valueIndex);
+                            ProcessSecurityData(securityData, table, null);
+                        }
 
-                    DataRow row = table.NewRow();
-                    row["security"] = companyName;
-
-                    // if the date is not null, it must be a reference request
-                    if (date != null)
-                        row["date"] = date;
-
-                    for (int j = 0; j < fieldData.NumElements; j++)
-                    {
-                        Element field = fieldData.GetElement(j);
-                        row[field.Name.ToString()] = field.GetValueAsString();
-                    }
-                    table.Rows.Add(row);
+                        break;
                 }
             }// end of messages
+        }
+
+        private void ProcessSecurityData(Element securityData, DataTable table, string date)
+        {
+            string companyName = securityData.GetElementAsString("security");
+
+            if (securityData.HasElement("securityError"))
+            {
+                Element securityError = securityData.GetElement("securityError");
+                Logger("* security =" + companyName + " : " + securityError.GetElementAsString("message"));
+            }
+            else
+            {
+                DataRow row = table.NewRow();
+                row["security"] = companyName;
+                Element fieldData = securityData.GetElement("fieldData");
+
+                // if the date is not null, it must be a reference request
+                if (date != null)
+                    row["date"] = date;
+
+                for (int j = 0; j < fieldData.NumElements; j++)
+                {
+                    Element field = fieldData.GetElement(j);
+                    row[field.Name.ToString()] = field.GetValueAsString();
+                }
+                table.Rows.Add(row);
+
+            }
+
         }
 
 
