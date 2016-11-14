@@ -72,6 +72,8 @@ namespace BloombergRequest
         public DataTable PopulateTable(DataTable table)
         {
             DataTable result;
+            string output = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\positions_results_" + DateTime.Now.ToShortDateString().Replace('/', '-') + ".csv";
+
             foreach (DataRow row in table.Rows)
             {
 
@@ -85,7 +87,7 @@ namespace BloombergRequest
                 {
 
                     RequestStruct request = new RequestStruct();
-                    BloombergData bd = new BloombergData(null);
+                    BloombergData bd = new BloombergData();
 
                     //format and send the bloomberg request
                     request.Type = RequestType.HISTORICAL;
@@ -94,13 +96,20 @@ namespace BloombergRequest
                     request.EndDate = start.AddMonths(month);
                     request.Data["fields"] = new List<string> { "PX_LAST" };
                     request.Data["securities"] = new List<string> { security };
-                    result = bd.BloombergRequest(request, false);
+                    result = bd.BloombergRequest(request);
 
                     // Column offset for first 3 populated values
                     row[counter + 3] = result.Rows[0]["PX_LAST"];
                     counter++;
                 }
             }
+
+
+            using (StreamWriter write = new StreamWriter(output))
+            {
+                BloombergData.DataTableToCSV(table, write, true);
+            }
+
             return table;
         }
 

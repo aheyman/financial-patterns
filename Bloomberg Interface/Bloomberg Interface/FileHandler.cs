@@ -13,12 +13,19 @@ namespace BloombergRequest
 
         static void Main(string[] args)
         {
+            string output = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\request_" + DateTime.Now.ToShortDateString().Replace('/', '-') + ".csv";
             string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
             string input = @"rawvalues.cfg";
 
-            RequestStruct request = ParseFile(Path.Combine(desktop,input));
-            BloombergData data = new BloombergData(null);
-            var ans = data.BloombergRequest(request, true);
+            RequestStruct request = ParseFile(Path.Combine(desktop, input));
+            BloombergData data = new BloombergData();
+            var ans = data.BloombergRequest(request);
+            
+            using (StreamWriter write = new StreamWriter(output))
+            {
+                BloombergData.DataTableToCSV(ans, write, true);
+            }
+
 
         }
 
@@ -40,7 +47,7 @@ namespace BloombergRequest
                     RequestStruct input = new RequestStruct();
                     switch (line[1].ToLower())
                     {
-                        
+
                         case "historical":
                             input.Type = RequestType.HISTORICAL;
                             break;
@@ -63,7 +70,7 @@ namespace BloombergRequest
                                 input.EndDate = Convert.ToDateTime(line[1]);
                                 break;
                             case "securities":
-                                input.Data["securities"]= line[1].Split(',').ToList();
+                                input.Data["securities"] = line[1].Split(',').ToList();
                                 break;
                             case "fields":
                                 input.Data["fields"] = line[1].Split(',').ToList();

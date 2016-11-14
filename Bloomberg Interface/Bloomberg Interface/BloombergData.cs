@@ -61,7 +61,7 @@ namespace BloombergConnection
         string logFile;
 
 
-        public BloombergData(string outputLoc)
+        public BloombergData()
         {
             // Initalize the logger
             string filePath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\Error Log\";
@@ -70,16 +70,16 @@ namespace BloombergConnection
                 Directory.CreateDirectory(filePath);
 
             logFile = filePath + "log_" + DateTime.Now.ToShortDateString().Replace('/', '-') + ".txt";
-
-            if (outputLoc == null)
-                output = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\request_" + DateTime.Now.ToShortDateString().Replace('/', '-') + ".csv";
-            else
-                output = outputLoc;
         }
 
 
-
-        public DataTable BloombergRequest(RequestStruct formattedData, bool genCSV)
+        /// <summary>
+        /// Method to create Data Table for a request
+        /// </summary>
+        /// <param name="formattedData"></param>
+        /// <param name="genCSV"></param>
+        /// <returns></returns>
+        public DataTable BloombergRequest(RequestStruct formattedData)
         {
 
             DataTable table = new DataTable();
@@ -91,7 +91,6 @@ namespace BloombergConnection
 
             string ipAddress = ConfigurationManager.AppSettings["IPAddress"];
             int port = int.Parse(ConfigurationManager.AppSettings["port"]);
-
 
 
             using (Session sess = StartSession(ipAddress, port, refData))
@@ -132,13 +131,6 @@ namespace BloombergConnection
                 }
             }
 
-            if (genCSV)
-            {
-                using (StreamWriter write = new StreamWriter(output))
-                {
-                    DataTableToCSV(table, write, true);
-                }
-            }
 
             return table;
 
