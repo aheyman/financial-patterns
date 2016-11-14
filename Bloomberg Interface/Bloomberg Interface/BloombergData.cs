@@ -92,59 +92,43 @@ namespace BloombergConnection
             string ipAddress = ConfigurationManager.AppSettings["IPAddress"];
             int port = int.Parse(ConfigurationManager.AppSettings["port"]);
 
+
+
             using (Session sess = StartSession(ipAddress, port, refData))
             {
+                Request ans;
                 switch (formattedData.Type)
                 {
                     case RequestType.HISTORICAL:
-                        table = GenerateHistoricalRequest(formattedData, table, genCSV);
+                        ans = GenerateHistoricalRequest(sess, formattedData);
+                        try
+                        {
+                            sess.SendRequest(ans, new CorrelationID(1));
+                            ConsumeSession(sess, table, null);
+                        }
+                        catch (Exception e)
+                        {
+                            Logger(e.Message);
+                        }
                         break;
 
                     case RequestType.REFERENCE:
-                        table = GenerateReferenceRequest(formattedData, table, genCSV);
+                        List<string> daysToOverride = GetDateRange(formattedData.StartDate, formattedData.EndDate, Periodcity.QUARTERLY);
+                        // For each override day
+                        foreach (string day in daysToOverride)
+                        {
+                            ans = GenerateReferenceRequest(sess, formattedData, day);
+                            try
+                            {
+                                sess.SendRequest(ans, new CorrelationID(1));
+                                ConsumeSession(sess, table, day);
+                            }
+                            catch (Exception e)
+                            {
+                                Logger(e.Message);
+                            }
+                        }
                         break;
-                }
-            }
-            return table;
-        }
-
-        /// <summary>
-        /// Forms a Historical Request base on Data object
-        /// </summary>
-        /// <param name="formattedData"></param>
-        /// <param name="table"></param>
-        private DataTable GenerateHistoricalRequest(RequestStruct formattedData, DataTable table, bool genCSV)
-        {
-            string ipAddress = ConfigurationManager.AppSettings["IPAddress"];
-            int port = int.Parse(ConfigurationManager.AppSettings["port"]);
-
-            using (Session sess = StartSession(ipAddress, port, refData))
-            {
-                Service refDataSvc = sess.GetService(refData);
-                Request request = refDataSvc.CreateRequest("HistoricalDataRequest");
-                string[] type = { "securities", "fields" };
-
-                foreach (string str in type)
-                {
-                    foreach (string value in formattedData.Data[str])
-                        request.GetElement(str).AppendValue(value);
-                }
-
-                request.Set("startDate", BloombergDateHelper(formattedData.StartDate));
-                request.Set("endDate", BloombergDateHelper(formattedData.EndDate));
-                request.Set("periodicitySelection", PeriodEnumToSting(formattedData.Period));
-                request.Set("nonTradingDayFillOption", "ALL_CALENDAR_DAYS");
-                request.Set("nonTradingDayFillMethod", "PREVIOUS_VALUE");
-
-                sess.SendRequest(request, new CorrelationID(1));
-
-                try
-                {
-                    ConsumeSession(sess, table, null);
-                }
-                catch (Exception e)
-                {
-                    Logger(e.Message);
                 }
             }
 
@@ -157,6 +141,34 @@ namespace BloombergConnection
             }
 
             return table;
+
+        }
+
+        /// <summary>
+        /// Forms a Historical Request base on Data object
+        /// </summary>
+        /// <param name="formattedData"></param>
+        /// <param name="table"></param>
+        private Request GenerateHistoricalRequest(Session sess, RequestStruct formattedData)
+        {
+
+            Service refDataSvc = sess.GetService(refData);
+            Request request = refDataSvc.CreateRequest("HistoricalDataRequest");
+            string[] type = { "securities", "fields" };
+
+            foreach (string str in type)
+            {
+                foreach (string value in formattedData.Data[str])
+                    request.GetElement(str).AppendValue(value);
+            }
+
+            request.Set("startDate", BloombergDateHelper(formattedData.StartDate));
+            request.Set("endDate", BloombergDateHelper(formattedData.EndDate));
+            request.Set("periodicitySelection", PeriodEnumToSting(formattedData.Period));
+            request.Set("nonTradingDayFillOption", "ALL_CALENDAR_DAYS");
+            request.Set("nonTradingDayFillMethod", "PREVIOUS_VALUE");
+
+            return request;
 
         }
 
@@ -166,57 +178,42 @@ namespace BloombergConnection
         /// </summary>
         /// <param name="formattedData"></param>
         /// <param name="table"></param>
-        private DataTable GenerateReferenceRequest(RequestStruct formattedData, DataTable table, bool genCSV)
+        private Request GenerateReferenceRequest(Session sess, RequestStruct formattedData, string day)
         {
-            List<string> daysToOverride = GetDateRange(formattedData.StartDate, formattedData.EndDate, Periodcity.QUARTERLY);
 
-            //In the App.config file
-            string ipAddress = ConfigurationManager.AppSettings["IPAddress"];
-            int port = int.Parse(ConfigurationManager.AppSettings["port"]);
+            Service refdata = sess.GetService(refData);
+            Request req = refdata.CreateRequest("ReferenceDataRequest");
 
-            // For each override day
-            foreach (string day in daysToOverride)
+
+            var inputs = new string[] { "securities", "fields" };
+
+            foreach (string input in inputs)
             {
-                using (Session sess = StartSession(ipAddress, port, refData))
-                {
-                    Service refdata = sess.GetService(refData);
-                    Request req = refdata.CreateRequest("ReferenceDataRequest");
-
-
-                    var inputs = new string[] { "securities", "fields" };
-
-                    foreach (string input in inputs)
-                    {
-                        foreach (string val in formattedData.Data[input])
-                            req.GetElement(input).AppendValue(val);
-                    }
-                    
-
-                    Element overrides = req["overrides"];
-                    Element override1 = overrides.AppendElement();
-                    override1.SetElement("fieldId", "FUNDAMENTAL_PUBLIC_DATE");
-                    override1.SetElement("value", day);
-
-                    try
-                    {
-                        sess.SendRequest(req, new CorrelationID(1));
-                        ConsumeSession(sess, table, day);
-                    }
-                    catch (Exception e)
-                    {
-                        Logger(e.Message);
-                    }
-                }
+                foreach (string val in formattedData.Data[input])
+                    req.GetElement(input).AppendValue(val);
             }
 
-            if (genCSV)
+
+            Element overrides = req["overrides"];
+
+            List<Tuple<string, string>> override_pairs = new List<Tuple<string, string>>
+                    {
+                        new Tuple<string, string>("FUNDAMENTAL_PUBLIC_DATE",day),
+                        new Tuple<string, string>("FUND_PER","Q"),
+                    };
+
+
+            foreach (Tuple<string, string> tup in override_pairs)
             {
-                using (StreamWriter write = new StreamWriter(output))
-                    DataTableToCSV(table, write, true);
+                Element override1 = overrides.AppendElement();
+                override1.SetElement("fieldId", tup.Item1);
+                override1.SetElement("value", tup.Item2);
             }
 
-            return table;
+            return req;
         }
+
+
 
         /// <summary>
         /// Returns a Bloomberg Session to generate any type fo request
@@ -456,6 +453,11 @@ namespace BloombergConnection
 
         }
 
+        /// <summary>
+        /// Converts String to Periodict Enum
+        /// </summary>
+        /// <param name="input"></param>
+        /// <returns></returns>
         public static Periodcity StringToPeriodEnum(string input)
         {
             switch (input.ToLower())
