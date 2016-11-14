@@ -30,6 +30,7 @@ namespace BloombergConnection
         public RequestType Type;
         public DateTime StartDate;
         public DateTime EndDate;
+        public List<Tuple<string, string>> overrides;
 
     }
 

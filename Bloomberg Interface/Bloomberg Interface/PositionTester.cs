@@ -90,11 +90,15 @@ namespace BloombergRequest
                     BloombergData bd = new BloombergData();
 
                     //format and send the bloomberg request
-                    request.Type = RequestType.HISTORICAL;
+                    request.Type = RequestType.REFERENCE;
                     request.Period = Periodcity.DAILY;
-                    request.StartDate = start.AddMonths(month);
-                    request.EndDate = start.AddMonths(month);
-                    request.Data["fields"] = new List<string> { "PX_LAST" };
+                    request.overrides = new List<Tuple<string, string>> {
+                        new Tuple<string, string>("CUST_TRR_START_DT", BloombergData.BloombergDateHelper(start)),
+                        new Tuple<string, string>("CUST_TRR_END_DT", BloombergData.BloombergDateHelper(start.AddMonths(month))),
+                        new Tuple<string, string>("CUST_TRR_CRNCY", "USD"),
+                        };
+                    
+                    request.Data["fields"] = new List<string> { "CUST_TRR_RETURN_HOLDING_PER" };
                     request.Data["securities"] = new List<string> { security };
                     result = bd.BloombergRequest(request);
 
