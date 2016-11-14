@@ -30,7 +30,7 @@ namespace BloombergConnection
         public RequestType Type;
         public DateTime StartDate;
         public DateTime EndDate;
-        public List<Tuple<string, string>> overrides;
+        public List<Tuple<string, string>> overrides = new List<Tuple<string, string>>();
 
     }
 
@@ -113,22 +113,19 @@ namespace BloombergConnection
                         break;
 
                     case RequestType.REFERENCE:
-                        List<string> daysToOverride = GetDateRange(formattedData.StartDate, formattedData.EndDate, Periodcity.QUARTERLY);
-                        // For each override day
-                        foreach (string day in daysToOverride)
+
+                        ans = GenerateReferenceRequest(sess, formattedData, day);
+                        try
                         {
-                            ans = GenerateReferenceRequest(sess, formattedData, day);
-                            try
-                            {
-                                sess.SendRequest(ans, new CorrelationID(1));
-                                ConsumeSession(sess, table, day);
-                            }
-                            catch (Exception e)
-                            {
-                                Logger(e.Message);
-                            }
+                            sess.SendRequest(ans, new CorrelationID(1));
+                            ConsumeSession(sess, table, day);
+                        }
+                        catch (Exception e)
+                        {
+                            Logger(e.Message);
                         }
                         break;
+
                 }
             }
 
@@ -189,14 +186,7 @@ namespace BloombergConnection
 
             Element overrides = req["overrides"];
 
-            List<Tuple<string, string>> override_pairs = new List<Tuple<string, string>>
-                    {
-                        new Tuple<string, string>("FUNDAMENTAL_PUBLIC_DATE",day),
-                        new Tuple<string, string>("FUND_PER","Q"),
-                    };
-
-
-            foreach (Tuple<string, string> tup in override_pairs)
+            foreach (Tuple<string, string> tup in formattedData.overrides)
             {
                 Element override1 = overrides.AppendElement();
                 override1.SetElement("fieldId", tup.Item1);

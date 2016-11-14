@@ -47,7 +47,6 @@ namespace BloombergRequest
                     RequestStruct input = new RequestStruct();
                     switch (line[1].ToLower())
                     {
-
                         case "historical":
                             input.Type = RequestType.HISTORICAL;
                             break;
