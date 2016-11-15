@@ -49,7 +49,7 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="Bloomberglp.Blpapi">
-      <HintPath>\\svscbvuser02\users$\ajh3126\Downloads\blpapi_dotnet_3.8.10.1\blpapi_dotnet_3.8.10.1\bin\Bloomberglp.Blpapi.dll</HintPath>
+      <HintPath>..\..\..\..\..\Downloads\blpapi_dotnet_3.8.10.1\blpapi_dotnet_3.8.10.1\bin\Bloomberglp.Blpapi.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.configuration" />

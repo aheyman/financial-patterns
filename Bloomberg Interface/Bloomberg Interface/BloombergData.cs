@@ -20,7 +20,6 @@ namespace BloombergConnection
 
     public class RequestStruct
     {
-
         public Dictionary<string, List<string>> Data = new Dictionary<string, List<string>>
         {
             {"securities", new List<string>() },
@@ -31,6 +30,7 @@ namespace BloombergConnection
         public DateTime StartDate;
         public DateTime EndDate;
         public List<Tuple<string, string>> overrides = new List<Tuple<string, string>>();
+        public bool loopRequests;
 
     }
 
@@ -80,53 +80,36 @@ namespace BloombergConnection
         /// <param name="formattedData"></param>
         /// <param name="genCSV"></param>
         /// <returns></returns>
-        public DataTable BloombergRequest(RequestStruct formattedData)
+        public DataTable BloombergRequest(RequestStruct formattedData, DataTable table, string date)
         {
-
-            DataTable table = new DataTable();
-            table.Columns.Add("date");
-            table.Columns.Add("security");
-
-            foreach (string str in formattedData.Data["fields"])
-                table.Columns.Add(str);
 
             string ipAddress = ConfigurationManager.AppSettings["IPAddress"];
             int port = int.Parse(ConfigurationManager.AppSettings["port"]);
 
-
             using (Session sess = StartSession(ipAddress, port, refData))
             {
-                Request ans;
+                Request ans = null;
                 switch (formattedData.Type)
                 {
                     case RequestType.HISTORICAL:
                         ans = GenerateHistoricalRequest(sess, formattedData);
-                        try
-                        {
-                            sess.SendRequest(ans, new CorrelationID(1));
-                            ConsumeSession(sess, table, null);
-                        }
-                        catch (Exception e)
-                        {
-                            Logger(e.Message);
-                        }
                         break;
 
                     case RequestType.REFERENCE:
-
-                        ans = GenerateReferenceRequest(sess, formattedData, day);
-                        try
-                        {
-                            sess.SendRequest(ans, new CorrelationID(1));
-                            ConsumeSession(sess, table, day);
-                        }
-                        catch (Exception e)
-                        {
-                            Logger(e.Message);
-                        }
+                        ans = GenerateReferenceRequest(sess, formattedData);
                         break;
-
                 }
+
+                try
+                {
+                    sess.SendRequest(ans, new CorrelationID(1));
+                    ConsumeSession(sess, table, date);
+                }
+                catch (Exception e)
+                {
+                    Logger(e.Message);
+                }
+                
             }
 
 
@@ -168,7 +151,7 @@ namespace BloombergConnection
         /// </summary>
         /// <param name="formattedData"></param>
         /// <param name="table"></param>
-        private Request GenerateReferenceRequest(Session sess, RequestStruct formattedData, string day)
+        private Request GenerateReferenceRequest(Session sess, RequestStruct formattedData)
         {
 
             Service refdata = sess.GetService(refData);
@@ -298,15 +281,13 @@ namespace BloombergConnection
 
                 Element securityDataArray = DataResponse.GetElement("securityData");
 
-                switch (date)
+                switch (table.TableName.ToLower())
                 {
                     // For historical data repsonses, there is only one security data element
-                    case null:
+                    case "historical":
                         ProcessSecurityData(securityDataArray, table, null);
                         break;
-
-                    // For reference data responses, there are multiples.  Iterate through
-                    default:
+                    case "reference":
                         for (int valueIndex = 0; valueIndex < securityDataArray.NumValues; valueIndex++)
                         {
                             Element securityData = securityDataArray.GetValueAsElement(valueIndex);
@@ -376,7 +357,7 @@ namespace BloombergConnection
         /// <param name="endDate"></param>
         /// <param name="period"></param>
         /// <returns></returns>
-        private List<string> GetDateRange(DateTime startDate, DateTime endDate, Periodcity period)
+        public List<string> GetDateRange(DateTime startDate, DateTime endDate, Periodcity period)
         {
 
             List<string> result = new List<string>();
@@ -430,6 +411,21 @@ namespace BloombergConnection
                     return "QUARTERLY";
                 case Periodcity.YEARLY:
                     return "YEARLY";
+                default:
+                    throw new ArgumentException("what period did you finagle in here");
+            }
+
+        }
+
+        public static string TypeEnumToString(RequestType val)
+        {
+            switch (val)
+            {
+                case RequestType.HISTORICAL:
+                    return "Historical";
+                case RequestType.REFERENCE:
+                    return "Reference";
+                
                 default:
                     throw new ArgumentException("what period did you finagle in here");
             }
