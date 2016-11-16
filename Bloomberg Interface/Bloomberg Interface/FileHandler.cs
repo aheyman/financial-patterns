@@ -29,23 +29,17 @@ namespace BloombergRequest
             foreach (string str in request.Data["fields"])
                 table.Columns.Add(str);
 
-            if (request.loopRequests) { 
-
-                List<string> daysToOverride = data.GetDateRange(request.StartDate, request.EndDate, Periodcity.QUARTERLY);
-                
-                foreach (string day in daysToOverride)
-                {
-                    request.overrides.AddRange(new List<Tuple<string, string>>
-                    {
-                        new Tuple<string, string>("FUNDAMENTAL_PUBLIC_DATE", day),
-                        new Tuple<string, string>("FUND_PER", "Q"),
-                    });
-                    data.BloombergRequest(request, table, day);
-                }
-            }
-            else
+            switch (request.subType)
             {
-                data.BloombergRequest(request, table, null);
+                case "financial":
+                    ReferenceRequest(data, request, table);
+                    break;
+                case "estimates":
+                    EstimatesRequest(data, request, table);
+                    break;
+                default:
+                    data.BloombergRequest(request, table, null);
+                    break;
             }
             
             using (StreamWriter write = new StreamWriter(output))
@@ -53,6 +47,40 @@ namespace BloombergRequest
                 BloombergData.DataTableToCSV(table, write, true);
             }
 
+        }
+
+        static public void EstimatesRequest(BloombergData data, RequestStruct request, DataTable table)
+        {
+            List<string> quarterOverrides = data.GetDateRange(request.StartDate, request.EndDate, Periodcity.QUARTERLY);
+
+            string[] quarters = { "Q1", "Q2", "Q3", "Q4" };
+
+            foreach (string day in quarterOverrides)
+            {
+                foreach (string quarter in quarters)
+                {
+                    request.overrides.AddRange(new List<Tuple<string, string>>
+                    {
+                        new Tuple<string, string>("BEST_FPERIOD_OVERRIDE", day.Substring(2,2)+quarter),
+                    });
+                    data.BloombergRequest(request, table, day.Substring(0,4)+quarter);
+                }
+            }
+        }
+
+        static public void ReferenceRequest(BloombergData data, RequestStruct request, DataTable table)
+        {
+            List<string> daysToOverride = data.GetDateRange(request.StartDate, request.EndDate, Periodcity.QUARTERLY);
+
+            foreach (string day in daysToOverride)
+            {
+                request.overrides.AddRange(new List<Tuple<string, string>>
+                    {
+                        new Tuple<string, string>("FUNDAMENTAL_PUBLIC_DATE", day),
+                        new Tuple<string, string>("FUND_PER", "Q"),
+                    });
+                data.BloombergRequest(request, table, day);
+            }
         }
 
         /// <summary>
@@ -103,8 +131,8 @@ namespace BloombergRequest
                             case "periodicity":
                                 input.Period = BloombergData.StringToPeriodEnum(line[1]);
                                 break;
-                            case "loop":
-                                input.loopRequests = bool.Parse(line[1]);
+                            case "subtype":
+                                input.subType = line[1];
                                 break;
                             default:
                                 throw new ArgumentException("unknown key");

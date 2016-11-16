@@ -30,7 +30,7 @@ namespace BloombergConnection
         public DateTime StartDate;
         public DateTime EndDate;
         public List<Tuple<string, string>> overrides = new List<Tuple<string, string>>();
-        public bool loopRequests;
+        public string subType;
 
     }
 

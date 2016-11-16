@@ -37,7 +37,7 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup>
-    <StartupObject>BloombergRequest.PositionTester</StartupObject>
+    <StartupObject>BloombergRequest.BloombergFromFile</StartupObject>
   </PropertyGroup>
   <PropertyGroup>
     <ApplicationIcon>
