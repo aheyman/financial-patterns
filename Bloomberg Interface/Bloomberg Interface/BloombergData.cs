@@ -96,7 +96,7 @@ namespace BloombergConnection
                         break;
 
                     case RequestType.REFERENCE:
-                        ans = GenerateReferenceRequest(sess, formattedData);
+                       ans = GenerateReferenceRequest(sess, formattedData);
                         break;
                 }
 
@@ -249,8 +249,7 @@ namespace BloombergConnection
             Logger("EventType=" + eventObj.Type);
             foreach (Message message in eventObj.GetMessages())
             {
-                Logger("correlationID=" + message.CorrelationID);
-                Logger("messageType=" + message.MessageType);
+                Logger("correlationID=" + message.CorrelationID + "\nmessageType=" + message.MessageType);                
                 if (Event.EventType.SESSION_STATUS == eventObj.Type && message.MessageType.Equals("SessionTerminated"))
                 {
                     Logger("Terminating: " + message.TopicName);
