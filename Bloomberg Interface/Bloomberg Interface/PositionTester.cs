@@ -37,16 +37,10 @@ namespace BloombergRequest
         public DataTable GenerateTable(string fileName)
         {
             DataTable table = new DataTable();
-
-            table.Columns.Add("SecurityName", typeof(string));
+            table.TableName = "reference";
+            table.Columns.Add("security", typeof(string));
             table.Columns.Add("Direction", typeof(string));
             table.Columns.Add("StartDate", typeof(DateTime));
-            table.Columns.Add("Cost", typeof(double));
-            table.Columns.Add("1mth_px", typeof(double));
-            table.Columns.Add("3mth_px", typeof(double));
-            table.Columns.Add("6mth_px", typeof(double));
-            table.Columns.Add("12mth_px", typeof(double));
-            table.Columns.Add("24mth_px", typeof(double));
 
             using (StreamReader reader = new StreamReader(fileName))
             {
@@ -54,7 +48,7 @@ namespace BloombergRequest
                 {
                     string[] result = reader.ReadLine().Split(',');
                     DataRow row = table.NewRow();
-                    row["SecurityName"] = result[0];
+                    row["security"] = result[0];
                     row["Direction"] = result[1];
                     row["StartDate"] = Convert.ToDateTime(result[2]);
                     table.Rows.Add(row);
@@ -71,21 +65,23 @@ namespace BloombergRequest
         /// <returns></returns>
         public DataTable PopulateTable(DataTable table)
         {
-            DataTable result;
+
             string output = Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + @"\positions_results_" + DateTime.Now.ToShortDateString().Replace('/', '-') + ".csv";
+            int[] months = { 1, 3, 6, 12, 24 };
+            int counter = 0;
 
-            foreach (DataRow row in table.Rows)
+            // for each month, 
+            foreach (int month in months)
             {
+                // add the column
+                table.Columns.Add("CUST_TRR_RETURN_HOLDING_PER", typeof(double));
 
-                int[] months = { 0, 1, 3, 6, 12, 24 };
-
-                string security = (string)row["SecurityName"];
-                DateTime start = (DateTime)row["StartDate"];
-                int counter = 0;
-
-                foreach (int month in months)
+                // Get the value for each row
+                foreach (DataRow row in table.Rows)
                 {
-
+                    string security = (string)row["security"];
+                    DateTime start = (DateTime)row["StartDate"];
+                    
                     RequestStruct request = new RequestStruct();
                     BloombergData bd = new BloombergData();
 
@@ -98,17 +94,40 @@ namespace BloombergRequest
                         new Tuple<string, string>("CUST_TRR_END_DT", BloombergData.BloombergDateHelper(start.AddMonths(month))),
                         new Tuple<string, string>("CUST_TRR_CRNCY", "USD")
                     });
-                       
+
                     request.Data["fields"] = new List<string> { "CUST_TRR_RETURN_HOLDING_PER" };
                     request.Data["securities"] = new List<string> { security };
-                    result = bd.BloombergRequest(request);
+
+                    DataTable dummy = new DataTable();
+                    dummy.TableName = "reference";
+                    dummy.Columns.Add("security", typeof(string));
+                    dummy.Columns.Add("CUST_TRR_RETURN_HOLDING_PER", typeof(double));
+
+                    bd.BloombergRequest(request, dummy, null);
 
                     // Column offset for first 3 populated values
-                    row[counter + 3] = result.Rows[0]["PX_LAST"];
-                    counter++;
+                    row[counter + 3] = dummy.Rows[0]["CUST_TRR_RETURN_HOLDING_PER"];
+                    
                 }
+
+                // replace column name
+                table.Columns["CUST_TRR_RETURN_HOLDING_PER"].ColumnName = "" + month + "mth_px";
+                counter++;
             }
 
+            // switch negatives and positives
+            foreach (DataRow row in table.Rows)
+            {
+                string direction = (string)row["Direction"];
+
+                if (direction.ToLower().Equals("sell"))
+                {
+                    for (int idx = 4; idx < table.Columns.Count; idx++)
+                    {
+                        row[idx] = -1 * (double)row[idx];
+                    }
+                }
+            }
 
             using (StreamWriter write = new StreamWriter(output))
             {
