@@ -48,12 +48,10 @@ namespace BloombergRequest
                 data.BloombergRequest(request, table, null);
             }
             
-            
             using (StreamWriter write = new StreamWriter(output))
             {
                 BloombergData.DataTableToCSV(table, write, true);
             }
-
 
         }
 

@@ -312,11 +312,16 @@ namespace BloombergConnection
 
                 Element fieldDataArray = securityData.GetElement("fieldData");
                 // if the date is not null, it must be a reference request
-                if (date != null)
+                if (table.TableName.ToLower().Equals("reference"))
                 {
                     DataRow row = table.NewRow();
                     row["security"] = companyName;
-                    row["date"] = date;
+
+                    // Such a hack
+                    if (date != null)
+                    {
+                        row["date"] = date;
+                    }
                     for (int fieldElms = 0; fieldElms < fieldDataArray.NumElements; fieldElms++)
                     {
                         Element field = fieldDataArray.GetElement(fieldElms);
