@@ -59,10 +59,10 @@ namespace BloombergRequest
             {
                 foreach (string quarter in quarters)
                 {
-                    request.overrides.AddRange(new List<Tuple<string, string>>
+                    request.overrides = new List<Tuple<string, string>>
                     {
                         new Tuple<string, string>("BEST_FPERIOD_OVERRIDE", day.Substring(2,2)+quarter),
-                    });
+                    };
                     data.BloombergRequest(request, table, day.Substring(0,4)+quarter);
                 }
             }
@@ -74,11 +74,11 @@ namespace BloombergRequest
 
             foreach (string day in daysToOverride)
             {
-                request.overrides.AddRange(new List<Tuple<string, string>>
+                request.overrides = new List<Tuple<string, string>>
                     {
                         new Tuple<string, string>("FUNDAMENTAL_PUBLIC_DATE", day),
                         new Tuple<string, string>("FUND_PER", "Q"),
-                    });
+                    };
                 data.BloombergRequest(request, table, day);
             }
         }
